@@ -5,8 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceBlend = join(projectRoot, 'blender', 'slop_zoo_game_assets.blend');
-const sanitizer = join(projectRoot, 'tools', 'sanitize_game_blend.py');
-
+const upgrader = join(projectRoot, 'tools', 'upgrade_game_assets.py');
 const candidates = [
   process.env.BLENDER_BIN,
   'blender',
@@ -15,9 +14,7 @@ const candidates = [
 ].filter(Boolean);
 
 function works(candidate) {
-  if (candidate.includes('/') || candidate.includes('\\')) {
-    if (!existsSync(candidate)) return false;
-  }
+  if ((candidate.includes('/') || candidate.includes('\\')) && !existsSync(candidate)) return false;
   const probe = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
   return probe.status === 0 && /^Blender 5\.2\./m.test(`${probe.stdout}${probe.stderr}`);
 }
@@ -38,7 +35,7 @@ const result = spawnSync(
     '1',
     sourceBlend,
     '--python',
-    sanitizer,
+    upgrader,
     '--',
     '--output-blend',
     sourceBlend,

@@ -10,11 +10,16 @@ import bpy
 
 
 SAFE_OBJECT_PROPS = {
-    "CannonAssetRoot": {"asset_role"},
+    "CannonAssetRoot": {"asset_role", "asset_id", "asset_version", "license"},
     "CannonYaw": {"runtime_control"},
     "CannonPitch": {"runtime_control"},
     "CannonRecoil": {"runtime_control"},
     "MuzzleAnchor": {"runtime_control"},
+    "CannonChargeGlow": {"runtime_control"},
+    "CannonAmmoGlow": {"runtime_control"},
+    "CannonGaugeNeedle": {"runtime_control"},
+    "CannonStatusLight": {"runtime_control"},
+    "CannonMuzzleGlow": {"runtime_control"},
 }
 
 

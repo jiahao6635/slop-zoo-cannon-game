@@ -1,5 +1,7 @@
 node_modules/
 dist/
+release/
+public/assets/.asset-build/
 .DS_Store
 *.blend1
 *.log

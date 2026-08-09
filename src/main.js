@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   AMMO_TYPES,
   HAZARD_TYPES,
@@ -26,6 +26,12 @@ import {
   normalizeSettings,
   saveSettings,
 } from './systems/settingsSystem.js';
+import {
+  collectNodeMeshes,
+  createCannonAssetLoader,
+  prepareCannonAsset,
+  resolveCannonRig,
+} from './render/cannonAsset.js';
 
 const GRAVITY = 9.8;
 const CLASSIC_DURATION = 75;
@@ -127,6 +133,11 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+
+const environmentGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = environmentGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.72;
+environmentGenerator.dispose();
 
 const camera = new THREE.PerspectiveCamera(49, 1, 0.1, 120);
 camera.position.set(-6.2, 5.4, 11.8);
@@ -257,7 +268,14 @@ cannonMount.add(aimYawRig);
 let modelYaw = null;
 let modelPitch = null;
 let modelRecoil = null;
+let modelMuzzle = null;
 let modelRecoilBase = new THREE.Vector3();
+let modelGaugeNeedle = null;
+let modelGaugeNeedleBase = 0;
+let modelChargeMeshes = [];
+let modelAmmoMeshes = [];
+let modelStatusMeshes = [];
+let modelMuzzleMeshes = [];
 
 const trajectoryGeometry = new THREE.BufferGeometry();
 const trajectoryPoints = new Float32Array(42 * 3);
@@ -297,6 +315,15 @@ function mesh(geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
   result.castShadow = true;
   result.receiveShadow = true;
   return result;
+}
+
+function disableObjectShadows(object) {
+  object.traverse((node) => {
+    if (!node.isMesh) return;
+    node.castShadow = false;
+    node.receiveShadow = false;
+  });
+  return object;
 }
 
 function addBox(parent, size, position, material = materials.wall, rotation = [0, 0, 0]) {
@@ -470,55 +497,52 @@ function createFallbackCannon() {
   addCylinder(recoil, 0.48, 0.72, [-0.62, 0, 0], materials.darkMetal, [0, 0, Math.PI / 2]);
   const hopper = mesh(new THREE.ConeGeometry(0.58, 0.85, 24), materials.brass, [-0.25, 0.93, 0], [0, 0, Math.PI]);
   recoil.add(hopper);
+  const muzzle = new THREE.Object3D();
+  muzzle.name = 'FallbackMuzzleAnchor';
+  muzzle.position.set(3.48, 0.29, 0);
+  recoil.add(muzzle);
 
   modelYaw = yaw;
   modelPitch = pitch;
   modelRecoil = recoil;
+  modelMuzzle = muzzle;
   modelRecoilBase.copy(recoil.position);
+  modelGaugeNeedle = null;
+  modelChargeMeshes = [];
+  modelAmmoMeshes = [];
+  modelStatusMeshes = [];
+  modelMuzzleMeshes = [];
   game.modelReady = true;
   return root;
 }
 
-function tuneBlenderMaterials(root) {
-  root.traverse((node) => {
-    if (!node.isMesh) return;
-    node.castShadow = true;
-    node.receiveShadow = true;
-    const list = Array.isArray(node.material) ? node.material : [node.material];
-    for (const material of list) {
-      if (!material) continue;
-      if (/Gunmetal/i.test(material.name)) {
-        material.metalness = 0.86;
-        material.roughness = 0.22;
-      }
-      if (/Brass/i.test(material.name)) {
-        material.metalness = 0.9;
-        material.roughness = 0.23;
-      }
-      material.needsUpdate = true;
-    }
-  });
-}
-
 function loadCannonAsset() {
   return new Promise((resolve) => {
-    const loader = new GLTFLoader();
+    const loader = createCannonAssetLoader();
     loader.load(
       `${import.meta.env.BASE_URL}assets/slop-cannon.glb`,
       (gltf) => {
         const root = gltf.scene;
         root.name = 'BlenderSlopCannon';
-        tuneBlenderMaterials(root);
+        prepareCannonAsset(root);
         cannonMount.add(root);
-        modelYaw = root.getObjectByName('CannonYaw');
-        modelPitch = root.getObjectByName('CannonPitch');
-        modelRecoil = root.getObjectByName('CannonRecoil');
-        if (!modelYaw || !modelPitch || !modelRecoil) {
+        const rig = resolveCannonRig(root);
+        if (rig.missing.length > 0) {
           cannonMount.remove(root);
           createFallbackCannon();
-          toast('Blender 素材层级缺失，已启用备用炮台', 'warning');
+          toast(`Blender 素材层级缺失：${rig.missing.join('、')}，已启用备用炮台`, 'warning');
         } else {
+          modelYaw = rig.yaw;
+          modelPitch = rig.pitch;
+          modelRecoil = rig.recoil;
+          modelMuzzle = rig.muzzle;
           modelRecoilBase.copy(modelRecoil.position);
+          modelGaugeNeedle = rig.gaugeNeedle;
+          modelGaugeNeedleBase = modelGaugeNeedle?.rotation.y ?? 0;
+          modelChargeMeshes = collectNodeMeshes(rig.chargeGlow);
+          modelAmmoMeshes = collectNodeMeshes(rig.ammoGlow);
+          modelStatusMeshes = collectNodeMeshes(rig.statusLight);
+          modelMuzzleMeshes = collectNodeMeshes(rig.muzzleGlow);
           game.modelReady = true;
         }
         dom.loadingProgress.style.width = '100%';
@@ -918,9 +942,47 @@ function updateAimRigs() {
   }
 }
 
+function setCannonGlow(meshes, intensity, color = null) {
+  for (const cannonMesh of meshes) {
+    const list = Array.isArray(cannonMesh.material) ? cannonMesh.material : [cannonMesh.material];
+    for (const material of list) {
+      if (!material) continue;
+      if ('emissiveIntensity' in material) material.emissiveIntensity = intensity;
+      if (color !== null) {
+        material.color?.setHex(color);
+        material.emissive?.setHex(color);
+      }
+    }
+  }
+}
+
+function updateCannonModelFeedback() {
+  const inventory = activeInventory();
+  const ammoRatio = inventory?.capacity > 0 ? inventory.current / inventory.capacity : 1;
+  const charge = game.charging ? game.charge : 0;
+  const reducedMotion = settings?.accessibility?.reducedMotion;
+  const pulse = reducedMotion ? 0 : (Math.sin(game.elapsed * 5.5) + 1) * 0.12;
+  const firingFlash = Math.min(1, game.recoil * 4.5);
+
+  setCannonGlow(modelChargeMeshes, 0.8 + charge * 4.8 + pulse + firingFlash * 2.4);
+  setCannonGlow(modelAmmoMeshes, 0.85 + ammoRatio * 2.65 + pulse * 0.5);
+  setCannonGlow(modelMuzzleMeshes, 0.35 + firingFlash * 10);
+
+  const statusCritical = game.phase === 'playing' && game.stability <= 25;
+  const statusWarning = game.phase === 'playing' && game.stability <= 50;
+  const statusColor = statusCritical ? colors.red : statusWarning ? colors.orange : colors.slime;
+  setCannonGlow(modelStatusMeshes, 1.5 + pulse * 4, statusColor);
+
+  if (modelGaugeNeedle) {
+    const target = modelGaugeNeedleBase + THREE.MathUtils.lerp(-0.15, 1.25, charge);
+    modelGaugeNeedle.rotation.y = THREE.MathUtils.lerp(modelGaugeNeedle.rotation.y, target, 0.22);
+  }
+}
+
 function getMuzzleState(position, direction) {
-  logicalMuzzle.getWorldPosition(position);
-  logicalMuzzle.getWorldQuaternion(temp.quaternion);
+  const muzzle = modelMuzzle ?? logicalMuzzle;
+  muzzle.getWorldPosition(position);
+  muzzle.getWorldQuaternion(temp.quaternion);
   direction.set(1, 0, 0).applyQuaternion(temp.quaternion).normalize();
 }
 
@@ -990,6 +1052,7 @@ function shoot(speed) {
   const tail = mesh(dropletGeometry, projectileMaterial, [-0.36, 0, 0]);
   tail.scale.set(2.1, 0.85, 0.85);
   projectileMesh.add(tail);
+  disableObjectShadows(projectileMesh);
   projectileMesh.position.copy(position);
   scene.add(projectileMesh);
 
@@ -1017,6 +1080,7 @@ function muzzleBurst(position, direction, material = materials.slime) {
   const count = settings?.accessibility?.reducedMotion ? 3 : 7;
   for (let i = 0; i < count; i += 1) {
     const drop = mesh(dropletGeometry, material);
+    disableObjectShadows(drop);
     drop.scale.setScalar(THREE.MathUtils.randFloat(0.45, 1.1));
     drop.position.copy(position);
     scene.add(drop);
@@ -1318,6 +1382,7 @@ function createBloomCharge(position, sourceProjectile, autoDelay = 1.15) {
   const bulb = mesh(new THREE.DodecahedronGeometry(0.35, 1), material);
   const ring = mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 28), material, [0, 0, 0], [Math.PI / 2, 0, 0]);
   chargeMesh.add(bulb, ring);
+  disableObjectShadows(chargeMesh);
   chargeMesh.position.copy(position);
   scene.add(chargeMesh);
   bloomCharges.push({ mesh: chargeMesh, sourceProjectile, age: 0, armed: false, autoDelay, life: 10 });
@@ -1391,6 +1456,7 @@ function createImpactParticles(position, color, count) {
   });
   for (let i = 0; i < actualCount; i += 1) {
     const drop = mesh(dropletGeometry, material);
+    disableObjectShadows(drop);
     drop.scale.setScalar(THREE.MathUtils.randFloat(0.5, 1.55));
     drop.position.copy(position);
     scene.add(drop);
@@ -1412,6 +1478,7 @@ function addSplat(position, color = colors.slime) {
     side: THREE.DoubleSide,
   });
   const splat = mesh(new THREE.CircleGeometry(THREE.MathUtils.randFloat(0.34, 0.7), 18), material);
+  disableObjectShadows(splat);
   splat.position.copy(position);
   splat.position.y = 0.025;
   splat.rotation.x = -Math.PI / 2;
@@ -1959,6 +2026,7 @@ function updateAnimation(dt) {
   game.recoil = THREE.MathUtils.damp(game.recoil, 0, 13, dt);
   game.shake = THREE.MathUtils.damp(game.shake, 0, 10, dt);
   updateAimRigs();
+  updateCannonModelFeedback();
 
   for (const prop of animatedProps) {
     if (prop.type === 'fan') prop.object.rotation.x += dt * 1.45;

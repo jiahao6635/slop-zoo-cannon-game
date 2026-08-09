@@ -4,6 +4,7 @@
   "description": "A browser-based 3D arcade game built with Three.js, Vite and Blender.",
   "private": true,
   "type": "module",
+  "main": "desktop/main.js",
   "license": "MIT",
   "author": "jiahao6635",
   "repository": {
@@ -28,16 +29,86 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "test": "node --test",
+    "test:desktop": "node --test test/platform-desktop.test.js",
     "build": "vite build",
-    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && vite build",
+    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && node --check src/platform/index.js && node --check src/platform/bootstrap.js && node --check src/render/cannonAsset.js && node --check desktop/main.js && node --check desktop/preload.cjs && node --check desktop/storage.js && node --check desktop/windowPolicy.js && node --check desktop/verifyDist.mjs && vite build && npm run check:desktop-dist && npm run check:assets",
     "preview": "vite preview --host 127.0.0.1",
+    "desktop:dev": "node desktop/dev.mjs",
+    "desktop:start": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --dir",
+    "desktop:dist:win": "npm run build && electron-builder --win nsis",
+    "desktop:dist:linux": "npm run build && electron-builder --linux AppImage",
+    "check:desktop-dist": "node desktop/verifyDist.mjs",
     "sanitize:assets": "node tools/sanitize_assets.mjs",
-    "export:assets": "node tools/export_assets.mjs"
+    "upgrade:assets": "node tools/upgrade_assets.mjs",
+    "export:assets": "node tools/export_assets.mjs",
+    "check:assets": "node tools/validate_game_glb.mjs public/assets/slop-cannon.glb"
   },
   "dependencies": {
     "three": "0.185.1"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "4.4.2",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
     "vite": "8.2.1"
+  },
+  "build": {
+    "appId": "com.jiahao6635.slopzoocannon",
+    "productName": "Slop Zoo Cannon",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.js",
+      "desktop/preload.cjs",
+      "desktop/storage.js",
+      "desktop/windowPolicy.js",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "resetAdHocDarwinSignature": true
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Game",
+      "synopsis": "A 3D arcade zoo supply-cannon game"
+    }
   }
 }

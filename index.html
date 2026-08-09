@@ -8,6 +8,10 @@
       content="黏液动物园：补给炮台——一款发射果冻补给、拯救黏液生物的 3D 街机游戏。"
     />
     <meta name="theme-color" content="#061b1c" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; worker-src 'self' blob:"
+    />
     <title>黏液动物园：补给炮台</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -596,6 +600,6 @@
     <noscript>
       <div class="noscript-message">请启用 JavaScript 以运行《黏液动物园：补给炮台》。</div>
     </noscript>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/platform/bootstrap.js"></script>
   </body>
 </html>

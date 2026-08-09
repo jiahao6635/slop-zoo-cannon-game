@@ -2,7 +2,7 @@
 
 一款以 Blender 炮台资产为视觉核心、用 Three.js 实现物理投射的 3D 街机游戏。玩家需要观察动物行为与机械威胁，切换黏液弹种、调整抛物线并完成动物园补给任务。
 
-> **当前状态：Steam 级垂直切片。** 仓库已包含一个可完整通关的 5 关战役区域与商业版所需的部分基础系统，但它仍不是内容完整、可直接发行的 Steam 1.0 版本。
+> **当前状态：Steam 级垂直切片 + Desktop Foundation。** 仓库已包含一个可完整通关的 5 关战役区域、安全 Electron 桌面壳与可恢复的本地档案基础，但它仍不是内容完整、可直接发行的 Steam 1.0 版本。
 
 [在线试玩](https://jiahao6635.github.io/slop-zoo-cannon-game/) · [Steam 版游戏设计](GAME_DESIGN.md) · [Steam 发行计划](STEAM_RELEASE_PLAN.md) · [参与贡献](CONTRIBUTING.md)
 
@@ -20,7 +20,9 @@
 - **物理与表现**：实时弹道预测、重力、连续线段碰撞、反弹、范围补给、落地黏液、粒子、后坐、屏幕震动和合成音效。
 - **经典轮班**：保留原型的 75 秒三波街机得分模式和独立最高分。
 - **离线游玩**：运行时不需要账号、后端或联网服务；游戏资产、存档和设置均使用本地资源。
-- **自动测试**：覆盖内容数据校验、任务解锁/奖励持久化、失败记录隔离和设置容错。
+- **安全桌面基础**：Electron 从 `dist` 离线加载，渲染进程启用隔离与沙箱，不具有 Node.js 权限；预加载层只暴露冻结的平台信息和受控存档 KV API，并在打包时关闭 RunAsNode、`NODE_OPTIONS` 和 CLI Inspect 等高风险 Fuse。
+- **桌面档案恢复**：用临时文件加原子替换写入，保留 3 份完整档案备份和最后一次正常退出快照，启动时会自动校验与恢复。
+- **自动测试**：覆盖内容数据校验、任务解锁/奖励持久化、失败记录隔离、设置容错、桌面安全策略以及 1000 次存档写入/损坏恢复。
 
 ## 与 Steam 1.0 的距离
 
@@ -29,7 +31,7 @@
 - 扩展多个动物园区域、更多动物与关卡，形成完整游戏时长。
 - 完成最终角色/环境美术、动画、音乐、叙事、本地化与全流程新手教程。
 - 进行大规模玩法平衡、性能/兼容性测试、可访问性审核与外部 QA。
-- 提供桌面发行封装，并接入 Steamworks 成就、云存档、状态与 Steam Deck 实机验证。
+- 完成桌面包的正式应用身份、代码签名与真机发布回归，并接入 Steamworks 成就、云存档、状态和 Steam Deck 验证。
 
 完整目标范围见 [Steam 版游戏设计](GAME_DESIGN.md)，分阶段发行工作见 [Steam 发行计划](STEAM_RELEASE_PLAN.md)。
 
@@ -50,6 +52,25 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+### 桌面开发与打包
+
+安全 Electron 桌面壳会在开发时连接本机 Vite，生产时只从 `dist` 读取离线资源：
+
+```bash
+npm run desktop:dev
+npm run desktop:start
+```
+
+生成当前系统的未签名解包目录，或生成 Windows/Linux 发行包：
+
+```bash
+npm run desktop:pack
+npm run desktop:dist:win
+npm run desktop:dist:linux
+```
+
+Windows 与 Linux 发行包配置使用占位应用身份，不包含代码签名或真实 Steam App ID。Steamworks 在当前阶段会报告 `unavailable / local-mock`，不会阻止离线启动、游玩和存档。
 
 ## 操作
 
@@ -94,14 +115,20 @@ BLENDER_BIN=/path/to/blender npm run export:assets
 
 导出会更新 `public/assets/slop-cannon.glb`，即 Three.js 加载的发布资产。
 
-Blender 文件包含 35 个 `CANNON_*` 网格以及以下运行时控制节点：
+Blender 源文件保留可编辑的炮台主体，并加入黏液弹药罐、充能线圈、炮口发光环、压力表指针、状态灯和橙色安全底环。发布导出保留以下运行时控制节点：
 
+- `CannonAssetRoot`：炮台资产根节点。
 - `CannonYaw`：水平瞄准。
 - `CannonPitch`：俯仰瞄准。
 - `CannonRecoil`：发射后坐。
 - `MuzzleAnchor`：炮弹生成点。
+- `CannonChargeGlow`：随蓄力变化的充能线圈。
+- `CannonAmmoGlow`：随弹药库存变化的黏液弹药罐。
+- `CannonGaugeNeedle`：指示蓄力程度的仪表指针。
+- `CannonStatusLight`：指示任务稳定度的状态灯。
+- `CannonMuzzleGlow`：响应蓄力、开火与后坐的炮口光效。
 
-GLB 约 24,840 个应用修改器后的三角面、2 个 PBR 材质，不包含相机、灯光或 Blender 流体缓存。实时黏液弹与飞溅由 Three.js 生成，更适合游戏运行时。
+当前 GLB 经合批、去重与 Meshopt 压缩后为 18 个节点、8 个网格、11 个图元、27,336 个三角面、4 个 PBR 材质和 138,576 字节，不包含纹理、动画、相机或灯光。导出阶段会拒绝退化面；`public/assets/slop-cannon.asset.json` 记录许可证、工具链、SHA-256 与预算统计，`npm run check:assets` 会验证节点契约与发布预算。实时黏液弹与飞溅由 Three.js 生成。
 
 ## 目录
 
@@ -113,8 +140,12 @@ src/content/gameContent.js           5 关、弹药、威胁、模块、奖励�
 src/systems/inputSystem.js           键鼠/手柄输入、设备切换与震动
 src/systems/saveSystem.js            版本化本地存档、备份、迁移与任务奖励
 src/systems/settingsSystem.js        设置验证、持久化与运行时应用
+src/platform/                        Web/桌面平台门面与存档启动迁移
+desktop/                             Electron 主进程、preload、安全策略与原子档案
 test/content-save-settings.test.js   内容、存档和设置自动测试
+test/platform-desktop.test.js        桌面安全、1000 次写入与损坏恢复测试
 public/assets/slop-cannon.glb         发布用 Blender 炮台模型
+public/assets/slop-cannon.asset.json  炮台许可、校验值与性能预算清单
 blender/slop_zoo_game_assets.blend   可编辑 Blender 源文件
 tools/                               Blender 导出与资产净化工具
 GAME_DESIGN.md                       Steam 1.0 内容设计
@@ -135,13 +166,14 @@ npm test
 npm run check
 ```
 
-Blender 5.2 LTS 后台导出已验证通过。网页切片已覆盖主菜单、任务解锁、配装、设置、暂停/重试、成功/失败结算以及 Boss 三阶段流程。
+Blender 5.2 LTS 后台导出已验证通过。网页切片已覆盖主菜单、任务解锁、配装、设置、暂停/重试、成功/失败结算以及 Boss 三阶段流程。CI 会额外生成未签名的 Windows x64 和 Linux x64 测试包；真实证书、Steam App ID 和 Steamworks SDK 将在发行账号准备完成后接入。
 
 ## 技术与致谢
 
 - [Three.js](https://threejs.org/)：WebGL 3D 渲染。
 - [Vite](https://vite.dev/)：本地开发与生产构建。
 - [Blender](https://www.blender.org/)：炮台建模和 GLB 导出。
+- [Electron](https://www.electronjs.org/)：桌面封装与本地平台桥。
 
 ## 开源许可证
 

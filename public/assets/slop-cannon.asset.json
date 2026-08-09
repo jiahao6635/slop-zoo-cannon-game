@@ -1,0 +1,23 @@
+{
+  "assetId": "slop-zoo-cannon",
+  "assetVersion": 2,
+  "license": "MIT",
+  "nodeCount": 18,
+  "meshCount": 8,
+  "primitiveCount": 11,
+  "materialCount": 4,
+  "triangleCount": 27336,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization"
+  ],
+  "source": "blender/slop_zoo_game_assets.blend",
+  "output": "public/assets/slop-cannon.glb",
+  "bytes": 138576,
+  "sha256": "cc02e350e515b76edd393420c9eac6dfed268b5ee533a9e9459e7de397a7968c",
+  "toolchain": {
+    "blender": "5.2 LTS",
+    "gltfTransform": "4.4.2"
+  }
+}
