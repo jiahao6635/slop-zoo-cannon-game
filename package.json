@@ -31,7 +31,7 @@
     "test": "node --test",
     "test:desktop": "node --test test/platform-desktop.test.js",
     "build": "vite build",
-    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && node --check src/platform/index.js && node --check src/platform/bootstrap.js && node --check src/render/cannonAsset.js && node --check desktop/main.js && node --check desktop/preload.cjs && node --check desktop/storage.js && node --check desktop/windowPolicy.js && node --check desktop/verifyDist.mjs && vite build && npm run check:desktop-dist && npm run check:assets",
+    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && node --check src/platform/index.js && node --check src/platform/bootstrap.js && node --check src/render/cannonAsset.js && node --check src/render/dynamicResolution.js && node --check src/render/objectPool.js && node --check src/render/performanceMonitor.js && node --check desktop/main.js && node --check desktop/preload.cjs && node --check desktop/storage.js && node --check desktop/windowPolicy.js && node --check desktop/verifyDist.mjs && vite build && npm run check:desktop-dist && npm run check:assets",
     "preview": "vite preview --host 127.0.0.1",
     "desktop:dev": "node desktop/dev.mjs",
     "desktop:start": "npm run build && electron .",

@@ -32,12 +32,43 @@ import {
   prepareCannonAsset,
   resolveCannonRig,
 } from './render/cannonAsset.js';
+import { createObjectPool } from './render/objectPool.js';
+import { createPerformanceMonitor } from './render/performanceMonitor.js';
+import { createDynamicResolutionController } from './render/dynamicResolution.js';
 
 const GRAVITY = 9.8;
 const CLASSIC_DURATION = 75;
 const MAX_ACTIVE_TARGETS = 7;
 const FIXED_TIME_STEP = 1 / 60;
 const MAX_SIMULATION_STEPS = 3;
+const RUNTIME_POOL_CAPACITIES = Object.freeze({
+  projectiles: 48,
+  particles: 384,
+  splats: 24,
+  bloomCharges: 16,
+});
+const RUNTIME_QUALITY_PRESETS = Object.freeze({
+  low: Object.freeze({ shadowQuality: 'low', particleQuality: 'low', renderScale: 0.75 }),
+  medium: Object.freeze({ shadowQuality: 'medium', particleQuality: 'medium', renderScale: 1 }),
+  high: Object.freeze({ shadowQuality: 'high', particleQuality: 'high', renderScale: 1.25 }),
+});
+const DYNAMIC_RESOLUTION_QUALITY_PRESETS = Object.freeze({
+  low: Object.freeze({ minScale: 0.5, maxScale: 0.85 }),
+  medium: Object.freeze({ minScale: 0.65, maxScale: 1 }),
+  high: Object.freeze({ minScale: 0.75, maxScale: 1.25 }),
+});
+const SHADOW_QUALITY_PROFILES = Object.freeze({
+  off: Object.freeze({ enabled: false, mapSize: 512, type: THREE.BasicShadowMap }),
+  low: Object.freeze({ enabled: true, mapSize: 512, type: THREE.BasicShadowMap }),
+  medium: Object.freeze({ enabled: true, mapSize: 1024, type: THREE.PCFShadowMap }),
+  high: Object.freeze({ enabled: true, mapSize: 2048, type: THREE.PCFSoftShadowMap }),
+});
+const PARTICLE_QUALITY_PROFILES = Object.freeze({
+  low: Object.freeze({ multiplier: 0.35, splatLimit: 8 }),
+  medium: Object.freeze({ multiplier: 0.65, splatLimit: 16 }),
+  high: Object.freeze({ multiplier: 1, splatLimit: 24 }),
+});
+const DISTANT_PARTICLE_LOD_DISTANCE_SQ = 18 ** 2;
 const ANIMAL_NAMES = Object.freeze({ panda: '熊猫', rabbit: '跃跃兔', bunny: '跃跃兔', frog: '弹簧蛙', bear: '月牙熊', otter: '月牙熊' });
 const AMMO_UI_CLASS = Object.freeze({
   'nutrient-gel': 'nutrition',
@@ -165,6 +196,29 @@ let settings = null;
 let inputSystem = null;
 let settingsReturnPhase = 'main-menu';
 let bossMachine = null;
+let keyLight = null;
+
+const runtimeGraphics = {
+  qualityPreset: DEFAULT_SETTINGS.graphics.qualityPreset,
+  dynamicRenderScale: DEFAULT_SETTINGS.graphics.dynamicRenderScale,
+  shadowQuality: DEFAULT_SETTINGS.graphics.shadowQuality,
+  particleQuality: DEFAULT_SETTINGS.graphics.particleQuality,
+  particleMultiplier: PARTICLE_QUALITY_PROFILES[DEFAULT_SETTINGS.graphics.particleQuality].multiplier,
+  splatLimit: PARTICLE_QUALITY_PROFILES[DEFAULT_SETTINGS.graphics.particleQuality].splatLimit,
+  userRenderScale: DEFAULT_SETTINGS.graphics.renderScale,
+  actualRenderScale: DEFAULT_SETTINGS.graphics.renderScale,
+  pixelRatio: 1,
+  lastDynamicDecision: null,
+};
+
+const dynamicResolutionController = createDynamicResolutionController({
+  enabled: runtimeGraphics.dynamicRenderScale,
+  qualityPreset: runtimeGraphics.qualityPreset,
+  qualityPresets: DYNAMIC_RESOLUTION_QUALITY_PRESETS,
+  downSamples: 2,
+  upSamples: 5,
+  cooldownSamples: 4,
+});
 
 const game = {
   phase: 'loading',
@@ -296,6 +350,14 @@ scene.add(trajectory);
 
 const projectileGeometry = new THREE.IcosahedronGeometry(0.3, 2);
 const dropletGeometry = new THREE.IcosahedronGeometry(0.1, 1);
+const dropletLowGeometry = new THREE.IcosahedronGeometry(0.1, 0);
+const splatGeometry = new THREE.CircleGeometry(1, 18);
+const bloomBulbGeometry = new THREE.DodecahedronGeometry(0.35, 1);
+const bloomRingGeometry = new THREE.TorusGeometry(0.55, 0.045, 8, 28);
+const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const unitCylinderGeometry12 = new THREE.CylinderGeometry(1, 1, 1, 12);
+const unitCylinderGeometry18 = new THREE.CylinderGeometry(1, 1, 1, 18);
+const unitCylinderGeometry24 = new THREE.CylinderGeometry(1, 1, 1, 24);
 const targetPlateGeometry = new THREE.CylinderGeometry(0.88, 0.88, 0.18, 32);
 const targetRingGeometry = new THREE.TorusGeometry(0.89, 0.075, 10, 32);
 const eyeGeometry = new THREE.SphereGeometry(0.09, 16, 12);
@@ -305,6 +367,7 @@ const temp = {
   b: new THREE.Vector3(),
   c: new THREE.Vector3(),
   d: new THREE.Vector3(),
+  color: new THREE.Color(),
   quaternion: new THREE.Quaternion(),
 };
 
@@ -326,6 +389,524 @@ function disableObjectShadows(object) {
   return object;
 }
 
+function resetPooledObject3D(object) {
+  object.removeFromParent();
+  object.visible = false;
+  object.position.set(0, 0, 0);
+  object.rotation.set(0, 0, 0);
+  object.quaternion.identity();
+  object.scale.set(1, 1, 1);
+}
+
+const projectilePool = createObjectPool({
+  capacity: RUNTIME_POOL_CAPACITIES.projectiles,
+  create: () => {
+    const projectileMesh = new THREE.Group();
+    const core = mesh(projectileGeometry, materials.slime);
+    core.scale.set(1.18, 0.9, 0.9);
+    const tail = mesh(dropletGeometry, materials.slime, [-0.36, 0, 0]);
+    tail.scale.set(2.1, 0.85, 0.85);
+    projectileMesh.add(core, tail);
+    disableObjectShadows(projectileMesh);
+    projectileMesh.visible = false;
+    return {
+      mesh: projectileMesh,
+      core,
+      tail,
+      position: new THREE.Vector3(),
+      previous: new THREE.Vector3(),
+      velocity: new THREE.Vector3(),
+      impactPoint: null,
+      radius: 0.29,
+      ammoId: 'nutrient-gel',
+      gravityMultiplier: 1,
+      bouncesRemaining: 0,
+      bounces: 0,
+      hitSomething: false,
+      age: 0,
+    };
+  },
+  reset: (projectile) => {
+    resetPooledObject3D(projectile.mesh);
+    projectile.core.material = materials.slime;
+    projectile.tail.material = materials.slime;
+    projectile.position.set(0, 0, 0);
+    projectile.previous.set(0, 0, 0);
+    projectile.velocity.set(0, 0, 0);
+    projectile.impactPoint = null;
+    projectile.radius = 0.29;
+    projectile.ammoId = 'nutrient-gel';
+    projectile.gravityMultiplier = 1;
+    projectile.bouncesRemaining = 0;
+    projectile.bounces = 0;
+    projectile.hitSomething = false;
+    projectile.age = 0;
+  },
+});
+
+const particlePool = createObjectPool({
+  capacity: RUNTIME_POOL_CAPACITIES.particles,
+  create: () => {
+    const material = new THREE.MeshStandardMaterial({
+      color: colors.slime,
+      emissive: colors.slime,
+      emissiveIntensity: 0.75,
+      roughness: 0.32,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+    });
+    const particleMesh = mesh(dropletGeometry, material);
+    disableObjectShadows(particleMesh);
+    particleMesh.visible = false;
+    return {
+      mesh: particleMesh,
+      material,
+      velocity: new THREE.Vector3(),
+      life: 0,
+      age: 0,
+      gravity: 0,
+    };
+  },
+  reset: (particle) => {
+    resetPooledObject3D(particle.mesh);
+    particle.mesh.geometry = dropletGeometry;
+    particle.material.color.setHex(colors.slime);
+    particle.material.emissive.setHex(colors.slime);
+    particle.material.emissiveIntensity = 0.75;
+    particle.material.opacity = 1;
+    particle.velocity.set(0, 0, 0);
+    particle.life = 0;
+    particle.age = 0;
+    particle.gravity = 0;
+  },
+  dispose: (particle) => particle.material.dispose(),
+});
+
+const splatPool = createObjectPool({
+  capacity: RUNTIME_POOL_CAPACITIES.splats,
+  create: () => {
+    const material = new THREE.MeshBasicMaterial({
+      color: colors.slime,
+      transparent: true,
+      opacity: 0.66,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const splatMesh = mesh(splatGeometry, material);
+    disableObjectShadows(splatMesh);
+    splatMesh.visible = false;
+    return { mesh: splatMesh, material, age: 0, life: 8 };
+  },
+  reset: (splat) => {
+    resetPooledObject3D(splat.mesh);
+    splat.material.color.setHex(colors.slime);
+    splat.material.opacity = 0.66;
+    splat.age = 0;
+    splat.life = 8;
+  },
+  dispose: (splat) => splat.material.dispose(),
+});
+
+const bloomChargePool = createObjectPool({
+  capacity: RUNTIME_POOL_CAPACITIES.bloomCharges,
+  create: () => {
+    const chargeMesh = new THREE.Group();
+    const material = ammoMaterials['adhesive-bloom'];
+    const bulb = mesh(bloomBulbGeometry, material);
+    const ring = mesh(bloomRingGeometry, material, [0, 0, 0], [Math.PI / 2, 0, 0]);
+    chargeMesh.add(bulb, ring);
+    disableObjectShadows(chargeMesh);
+    chargeMesh.visible = false;
+    return {
+      mesh: chargeMesh,
+      sourceProjectile: {
+        ammoId: 'adhesive-bloom',
+        bounces: 0,
+        hitSomething: false,
+      },
+      age: 0,
+      armed: false,
+      autoDelay: 1.15,
+      life: 10,
+    };
+  },
+  reset: (charge) => {
+    resetPooledObject3D(charge.mesh);
+    charge.sourceProjectile.ammoId = 'adhesive-bloom';
+    charge.sourceProjectile.bounces = 0;
+    charge.sourceProjectile.hitSomething = false;
+    charge.age = 0;
+    charge.armed = false;
+    charge.autoDelay = 1.15;
+    charge.life = 10;
+  },
+});
+
+function resetAnimalPoolTarget(target) {
+  resetPooledObject3D(target.group);
+  target.base.set(0, 0, 0);
+  target.phase = 0;
+  target.speed = 0;
+  target.amplitude = 0;
+  target.age = 0;
+  target.lifetime = 0;
+  target.value = 0;
+  target.feedRequired = target.kind === 'panda' ? 2 : 1;
+  target.feedProgress = 0;
+  target.mouthOpen = target.kind !== 'bear';
+  target.apexWindow = false;
+  target.shielded = false;
+  target.lane = 1;
+
+  const { ring, requestRing, mouthIndicator } = target.group.userData;
+  ring.material.color.copy(materials.brass.color);
+  ring.material.emissive?.setHex(0x000000);
+  ring.material.emissiveIntensity = materials.brass.emissiveIntensity ?? 1;
+  ring.material.opacity = 1;
+  requestRing.material.color.setHex(colors.slime);
+  requestRing.material.emissive.setHex(colors.slime);
+  requestRing.material.emissiveIntensity = 1.8;
+  requestRing.material.opacity = 0.9;
+  requestRing.scale.set(1, 1, 1);
+  if (mouthIndicator) {
+    mouthIndicator.scale.set(1, 1, 1);
+    mouthIndicator.material.color.setHex(colors.orange);
+    mouthIndicator.material.emissive.setHex(0x56210a);
+    mouthIndicator.material.emissiveIntensity = 1.4;
+  }
+}
+
+function createAnimalTargetPool(kind) {
+  return createObjectPool({
+    capacity: 8,
+    create: () => {
+      const group = createAnimalTarget(kind);
+      group.visible = false;
+      return {
+        type: 'animal',
+        group,
+        base: new THREE.Vector3(),
+        kind,
+        radius: kind === 'panda' ? 1.12 : 1.02,
+        phase: 0,
+        speed: 0,
+        amplitude: 0,
+        age: 0,
+        lifetime: 0,
+        value: 0,
+        feedRequired: kind === 'panda' ? 2 : 1,
+        feedProgress: 0,
+        mouthOpen: kind !== 'bear',
+        apexWindow: false,
+        shielded: false,
+        lane: 1,
+      };
+    },
+    reset: resetAnimalPoolTarget,
+  });
+}
+
+function resetHazardPoolTarget(target) {
+  resetPooledObject3D(target.group);
+  target.base.set(0, 0, 0);
+  target.phase = 0;
+  target.speed = 0;
+  target.amplitude = 0;
+  target.age = 0;
+  target.lifetime = 0;
+  target.disabled = false;
+  target.interceptCooldown = 0;
+}
+
+function createHazardTargetPool(kind) {
+  return createObjectPool({
+    capacity: 8,
+    create: () => {
+      const group = createHazardTarget(kind);
+      group.visible = false;
+      return {
+        type: 'hazard',
+        kind,
+        group,
+        base: new THREE.Vector3(),
+        radius: kind === 'barrier-drone' ? 1.08 : 0.9,
+        phase: 0,
+        speed: 0,
+        amplitude: 0,
+        age: 0,
+        lifetime: 0,
+        disabled: false,
+        interceptCooldown: 0,
+      };
+    },
+    reset: resetHazardPoolTarget,
+  });
+}
+
+const animalTargetPools = Object.freeze({
+  panda: createAnimalTargetPool('panda'),
+  rabbit: createAnimalTargetPool('rabbit'),
+  frog: createAnimalTargetPool('frog'),
+  bear: createAnimalTargetPool('bear'),
+});
+
+const hazardTargetPools = Object.freeze({
+  'cleaner-drone': createHazardTargetPool('cleaner-drone'),
+  'snack-thief': createHazardTargetPool('snack-thief'),
+  'barrier-drone': createHazardTargetPool('barrier-drone'),
+});
+
+function resetBossPoolTarget(target) {
+  resetPooledObject3D(target.group);
+  target.base.set(0, 0, 0);
+  target.health = 0;
+  target.maxHealth = 0;
+  target.phase = 0;
+  target.age = 0;
+  target.openWindow = false;
+  target.ring.material.color.copy(materials.brass.color);
+  target.ring.material.emissive?.setHex(0x000000);
+  target.ring.material.opacity = 1;
+}
+
+function createBossTargetPool(kind, capacity) {
+  return createObjectPool({
+    capacity,
+    create: (index) => buildBossComponentTarget(kind, index),
+    reset: resetBossPoolTarget,
+  });
+}
+
+const bossTargetPools = Object.freeze({
+  'feed-port': createBossTargetPool('feed-port', 1),
+  'storage-tank': createBossTargetPool('storage-tank', 2),
+  'mobile-core': createBossTargetPool('mobile-core', 1),
+});
+
+const runtimePools = Object.freeze({
+  projectiles: projectilePool,
+  particles: particlePool,
+  splats: splatPool,
+  bloomCharges: bloomChargePool,
+  animalPanda: animalTargetPools.panda,
+  animalRabbit: animalTargetPools.rabbit,
+  animalFrog: animalTargetPools.frog,
+  animalBear: animalTargetPools.bear,
+  hazardCleaner: hazardTargetPools['cleaner-drone'],
+  hazardThief: hazardTargetPools['snack-thief'],
+  hazardBarrier: hazardTargetPools['barrier-drone'],
+  bossFeedPort: bossTargetPools['feed-port'],
+  bossStorageTank: bossTargetPools['storage-tank'],
+  bossMobileCore: bossTargetPools['mobile-core'],
+});
+
+function getRuntimePoolStats() {
+  return Object.fromEntries(Object.entries(runtimePools).map(([name, pool]) => [name, pool.snapshot()]));
+}
+
+const performanceAlertLog = [];
+let latestPerformanceSnapshot = null;
+let performanceHudElement = null;
+let performanceHudEnabled = false;
+
+const performanceMonitor = createPerformanceMonitor({
+  windowSeconds: 10,
+  warmupSeconds: 2,
+  sampleIntervalSeconds: 1,
+  alertDebounceSamples: 3,
+  budgets: {
+    avgFps: { min: 55 },
+    onePercentLowFps: { min: 45 },
+    frameP95Ms: { max: 24 },
+    drawCalls: { max: 250 },
+    triangles: { max: 500_000 },
+    geometries: { max: 300 },
+    textures: { max: 192 },
+    activeEntities: { max: 600 },
+  },
+  onAlert: (event) => {
+    performanceAlertLog.push({ ...event, limits: { ...event.limits } });
+    if (performanceAlertLog.length > 40) performanceAlertLog.shift();
+    const label = event.type === 'budget-exceeded' ? 'exceeded' : 'recovered';
+    console[event.type === 'budget-exceeded' ? 'warn' : 'info'](
+      `[performance] ${event.metric} ${label}`,
+      event.value,
+      event.limits,
+    );
+  },
+});
+
+function markShadowMaterialsForUpdate() {
+  scene.traverse((object) => {
+    if (!object.isMesh || !object.material) return;
+    const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of meshMaterials) material.needsUpdate = true;
+  });
+}
+
+function disposeKeyLightShadowTargets() {
+  if (!keyLight?.shadow) return;
+  keyLight.shadow.map?.dispose();
+  keyLight.shadow.mapPass?.dispose();
+  keyLight.shadow.map = null;
+  keyLight.shadow.mapPass = null;
+}
+
+function setRuntimeShadowQuality(shadowQuality) {
+  const profile = SHADOW_QUALITY_PROFILES[shadowQuality] ?? SHADOW_QUALITY_PROFILES.medium;
+  const previousEnabled = renderer.shadowMap.enabled;
+  const previousType = renderer.shadowMap.type;
+  const previousMapSize = keyLight?.shadow?.mapSize?.width ?? 0;
+  const configurationChanged = previousEnabled !== profile.enabled
+    || previousType !== profile.type
+    || previousMapSize !== profile.mapSize;
+
+  runtimeGraphics.shadowQuality = shadowQuality in SHADOW_QUALITY_PROFILES ? shadowQuality : 'medium';
+  renderer.shadowMap.enabled = profile.enabled;
+  renderer.shadowMap.type = profile.type;
+  renderer.shadowMap.needsUpdate = true;
+
+  if (keyLight) {
+    if (configurationChanged) disposeKeyLightShadowTargets();
+    keyLight.castShadow = profile.enabled;
+    keyLight.shadow.mapSize.set(profile.mapSize, profile.mapSize);
+    keyLight.shadow.needsUpdate = profile.enabled;
+  }
+
+  if (configurationChanged) markShadowMaterialsForUpdate();
+}
+
+function setRuntimeParticleQuality(particleQuality) {
+  const resolvedQuality = particleQuality in PARTICLE_QUALITY_PROFILES ? particleQuality : 'medium';
+  const profile = PARTICLE_QUALITY_PROFILES[resolvedQuality];
+  runtimeGraphics.particleQuality = resolvedQuality;
+  runtimeGraphics.particleMultiplier = profile.multiplier;
+  runtimeGraphics.splatLimit = Math.min(profile.splatLimit, splatPool.capacity);
+  while (splats.length > runtimeGraphics.splatLimit) releaseSplat(splats[0]);
+}
+
+function setRuntimeQualityPreset(qualityPreset) {
+  const resolvedPreset = qualityPreset in RUNTIME_QUALITY_PRESETS ? qualityPreset : 'medium';
+  runtimeGraphics.qualityPreset = resolvedPreset;
+  dynamicResolutionController.setQualityPreset(resolvedPreset);
+}
+
+function setRuntimeDynamicRenderScale(enabled) {
+  runtimeGraphics.dynamicRenderScale = Boolean(enabled);
+  dynamicResolutionController.setEnabled(runtimeGraphics.dynamicRenderScale);
+}
+
+function setRuntimeUserRenderScale(renderScale) {
+  runtimeGraphics.userRenderScale = THREE.MathUtils.clamp(Number(renderScale) || 1, 0.5, 1.5);
+}
+
+function setActualRenderScale(renderScale, { resizeRenderer = true } = {}) {
+  const nextScale = THREE.MathUtils.clamp(Number(renderScale) || 1, 0.5, 1.5);
+  const changed = Math.abs(runtimeGraphics.actualRenderScale - nextScale) > 0.0001;
+  runtimeGraphics.actualRenderScale = nextScale;
+  if (changed && resizeRenderer) resize();
+  return changed;
+}
+
+function resetDynamicRenderScale() {
+  dynamicResolutionController.reset();
+  runtimeGraphics.lastDynamicDecision = null;
+  const bounds = dynamicResolutionController.bounds;
+  const nextScale = runtimeGraphics.dynamicRenderScale
+    ? THREE.MathUtils.clamp(runtimeGraphics.userRenderScale, bounds.minScale, bounds.maxScale)
+    : runtimeGraphics.userRenderScale;
+  setActualRenderScale(nextScale, { resizeRenderer: false });
+}
+
+function sampleDynamicRenderScale(snapshot) {
+  const decision = dynamicResolutionController.recordSample(snapshot, runtimeGraphics.actualRenderScale);
+  runtimeGraphics.lastDynamicDecision = decision;
+  if (decision.changed) setActualRenderScale(decision.renderScale);
+  return decision;
+}
+
+function getRuntimeGraphicsReport() {
+  return {
+    qualityPreset: runtimeGraphics.qualityPreset,
+    dynamicRenderScale: runtimeGraphics.dynamicRenderScale,
+    shadowQuality: runtimeGraphics.shadowQuality,
+    particleQuality: runtimeGraphics.particleQuality,
+    particleMultiplier: runtimeGraphics.particleMultiplier,
+    splatLimit: runtimeGraphics.splatLimit,
+    userRenderScale: runtimeGraphics.userRenderScale,
+    actualRenderScale: runtimeGraphics.actualRenderScale,
+    pixelRatio: renderer.getPixelRatio(),
+    dynamicResolution: dynamicResolutionController.snapshot(),
+    lastDynamicDecision: runtimeGraphics.lastDynamicDecision,
+  };
+}
+
+function getRuntimeEntityCounts() {
+  return {
+    targets: targets.length,
+    projectiles: projectiles.length,
+    particles: particles.length,
+    splats: splats.length,
+    bloomCharges: bloomCharges.length,
+  };
+}
+
+function getPerformanceReport() {
+  return {
+    snapshot: latestPerformanceSnapshot ?? performanceMonitor.snapshot(),
+    graphics: getRuntimeGraphicsReport(),
+    pools: getRuntimePoolStats(),
+    entities: getRuntimeEntityCounts(),
+    alerts: performanceAlertLog.map((alert) => ({ ...alert, limits: { ...alert.limits } })),
+  };
+}
+
+function runPoolStressTest(options = {}) {
+  const cycles = THREE.MathUtils.clamp(Math.trunc(Number(options.cycles) || 10_000), 1, 200_000);
+  const requestedBatchSize = THREE.MathUtils.clamp(Math.trunc(Number(options.batchSize) || 32), 1, 256);
+  const before = getRuntimePoolStats();
+
+  const runPass = () => {
+    for (const [name, pool] of Object.entries(runtimePools)) {
+      const availableCapacity = Math.max(0, pool.capacity - pool.stats.active);
+      const targetWarmupLimit = name.startsWith('animal') || name.startsWith('hazard') ? 2 : requestedBatchSize;
+      const batchSize = Math.min(targetWarmupLimit, availableCapacity);
+      if (batchSize === 0) continue;
+      let remaining = cycles;
+      const acquired = [];
+      while (remaining > 0) {
+        const currentBatch = Math.min(batchSize, remaining);
+        for (let index = 0; index < currentBatch; index += 1) {
+          const item = pool.acquire();
+          if (item) acquired.push(item);
+        }
+        while (acquired.length > 0) pool.release(acquired.pop());
+        remaining -= currentBatch;
+      }
+    }
+  };
+
+  const startedAt = performance.now();
+  runPass();
+  const warmed = getRuntimePoolStats();
+  runPass();
+  const after = getRuntimePoolStats();
+  const names = Object.keys(runtimePools);
+  return {
+    cyclesPerPass: cycles,
+    batchSize: requestedBatchSize,
+    passes: 2,
+    durationMs: performance.now() - startedAt,
+    before,
+    warmed,
+    after,
+    createdPlateau: names.every((name) => after[name].created === warmed[name].created),
+    activeRestored: names.every((name) => after[name].active === before[name].active),
+    withinCapacity: names.every((name) => after[name].created <= after[name].capacity),
+  };
+}
+
 function addBox(parent, size, position, material = materials.wall, rotation = [0, 0, 0]) {
   const result = mesh(new THREE.BoxGeometry(...size), material, position, rotation);
   parent.add(result);
@@ -334,6 +915,47 @@ function addBox(parent, size, position, material = materials.wall, rotation = [0
 
 function addCylinder(parent, radius, depth, position, material, rotation = [0, 0, 0], segments = 24) {
   const result = mesh(new THREE.CylinderGeometry(radius, radius, depth, segments), material, position, rotation);
+  parent.add(result);
+  return result;
+}
+
+function addInstancedBoxes(parent, instances, material) {
+  const result = new THREE.InstancedMesh(unitBoxGeometry, material, instances.length);
+  const transform = new THREE.Object3D();
+  instances.forEach(({ size, position, rotation = [0, 0, 0] }, index) => {
+    transform.position.set(...position);
+    transform.rotation.set(...rotation);
+    transform.scale.set(...size);
+    transform.updateMatrix();
+    result.setMatrixAt(index, transform.matrix);
+  });
+  result.instanceMatrix.needsUpdate = true;
+  result.computeBoundingSphere();
+  result.castShadow = true;
+  result.receiveShadow = true;
+  parent.add(result);
+  return result;
+}
+
+function addInstancedCylinders(parent, instances, material, segments = 12) {
+  const geometry = segments === 24
+    ? unitCylinderGeometry24
+    : segments === 18
+      ? unitCylinderGeometry18
+      : unitCylinderGeometry12;
+  const result = new THREE.InstancedMesh(geometry, material, instances.length);
+  const transform = new THREE.Object3D();
+  instances.forEach(({ radius, depth, position, rotation = [0, 0, 0] }, index) => {
+    transform.position.set(...position);
+    transform.rotation.set(...rotation);
+    transform.scale.set(radius, depth, radius);
+    transform.updateMatrix();
+    result.setMatrixAt(index, transform.matrix);
+  });
+  result.instanceMatrix.needsUpdate = true;
+  result.computeBoundingSphere();
+  result.castShadow = true;
+  result.receiveShadow = true;
   parent.add(result);
   return result;
 }
@@ -382,29 +1004,37 @@ function buildEnvironment() {
   addBox(environment, [34, 7.2, 0.45], [8.5, 3.55, -10.3], materials.wall);
 
   const archMaterial = new THREE.MeshStandardMaterial({ color: 0x23464a, roughness: 0.55, metalness: 0.52 });
+  const archInstances = [];
   for (const x of [5.5, 11.5, 17.5, 23.5]) {
-    addBox(environment, [0.28, 6.7, 0.32], [x, 3.35, -8.7], archMaterial);
-    addBox(environment, [0.28, 6.7, 0.32], [x, 3.35, 8.7], archMaterial);
-    addBox(environment, [0.28, 0.32, 17.7], [x, 6.62, 0], archMaterial);
+    archInstances.push(
+      { size: [0.28, 6.7, 0.32], position: [x, 3.35, -8.7] },
+      { size: [0.28, 6.7, 0.32], position: [x, 3.35, 8.7] },
+      { size: [0.28, 0.32, 17.7], position: [x, 6.62, 0] },
+    );
   }
+  addInstancedBoxes(environment, archInstances, archMaterial);
 
   const railMaterial = new THREE.MeshStandardMaterial({ color: colors.brass, roughness: 0.33, metalness: 0.8 });
+  const railInstances = [];
   for (const z of [-2.2, 2.2]) {
-    addCylinder(environment, 0.045, 4.3, [0, 0.85, z], railMaterial, [0, 0, Math.PI / 2], 12);
+    railInstances.push({ radius: 0.045, depth: 4.3, position: [0, 0.85, z], rotation: [0, 0, Math.PI / 2] });
     for (const x of [-2, 0, 2]) {
-      addCylinder(environment, 0.05, 1.45, [x, 0.72, z], railMaterial, [0, 0, 0], 12);
+      railInstances.push({ radius: 0.05, depth: 1.45, position: [x, 0.72, z] });
     }
   }
+  addInstancedCylinders(environment, railInstances, railMaterial, 12);
 
   addBox(environment, [4.8, 0.28, 4.8], [0, 0.13, 0], new THREE.MeshStandardMaterial({ color: 0xd9e1d8, roughness: 0.78 }));
 
   const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x356c69, roughness: 0.42, metalness: 0.58 });
+  const pipeInstances = [];
   for (const y of [1.2, 1.75, 2.3]) {
-    addCylinder(environment, 0.11, 28, [10, y, -9.95], pipeMaterial, [0, 0, Math.PI / 2], 18);
+    pipeInstances.push({ radius: 0.11, depth: 28, position: [10, y, -9.95], rotation: [0, 0, Math.PI / 2] });
   }
   for (const x of [7, 14, 21]) {
-    addCylinder(environment, 0.12, 4.5, [x, 2.3, -9.95], pipeMaterial, [0, 0, 0], 18);
+    pipeInstances.push({ radius: 0.12, depth: 4.5, position: [x, 2.3, -9.95] });
   }
+  addInstancedCylinders(environment, pipeInstances, pipeMaterial, 18);
 
   const sign = mesh(
     new THREE.PlaneGeometry(6.8, 1.7),
@@ -421,46 +1051,52 @@ function buildEnvironment() {
     emissiveIntensity: 3.5,
     roughness: 0.22,
   });
-  for (const z of [-7.6, 0, 7.6]) {
-    addBox(environment, [0.08, 4.8, 0.12], [25.18, 3.2, z], neonMaterial);
-  }
+  addInstancedBoxes(environment, [-7.6, 0, 7.6].map((z) => ({
+    size: [0.08, 4.8, 0.12],
+    position: [25.18, 3.2, z],
+  })), neonMaterial);
 
+  const platformBases = [];
+  const platformPosts = [];
   for (let i = 0; i < 7; i += 1) {
-    const platform = new THREE.Group();
     const x = 13 + (i % 4) * 3.15;
     const z = -6.3 + Math.floor(i / 4) * 12.6 + (i % 2) * 0.8;
-    addBox(platform, [1.5, 0.2, 1.5], [0, 0.1, 0], materials.darkMetal);
-    addCylinder(platform, 0.14, 1 + (i % 3) * 0.35, [0, -0.45, 0], materials.brass);
-    platform.position.set(x, 0.65 + (i % 3) * 0.35, z);
-    environment.add(platform);
+    const heightOffset = (i % 3) * 0.35;
+    platformBases.push({ size: [1.5, 0.2, 1.5], position: [x, 0.75 + heightOffset, z] });
+    platformPosts.push({ radius: 0.14, depth: 1 + heightOffset, position: [x, 0.2 + heightOffset, z] });
   }
+  addInstancedBoxes(environment, platformBases, materials.darkMetal);
+  addInstancedCylinders(environment, platformPosts, materials.brass, 24);
 
   const fan = new THREE.Group();
   fan.position.set(25.1, 3.4, -6.2);
   fan.rotation.y = -Math.PI / 2;
   const hub = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.22, 24), materials.brass, [0, 0, 0], [Math.PI / 2, 0, 0]);
   fan.add(hub);
-  for (let i = 0; i < 4; i += 1) {
-    const blade = addBox(fan, [0.18, 1.5, 0.12], [0, 0.78, 0], materials.darkMetal);
-    blade.rotation.z = i * Math.PI / 2;
-    blade.position.set(-Math.sin(blade.rotation.z) * 0.75, Math.cos(blade.rotation.z) * 0.75, 0);
-  }
+  addInstancedBoxes(fan, Array.from({ length: 4 }, (_, index) => {
+    const rotation = index * Math.PI / 2;
+    return {
+      size: [0.18, 1.5, 0.12],
+      position: [-Math.sin(rotation) * 0.75, Math.cos(rotation) * 0.75, 0],
+      rotation: [0, 0, rotation],
+    };
+  }), materials.darkMetal);
   environment.add(fan);
   animatedProps.push({ object: fan, type: 'fan' });
 
   const hemi = new THREE.HemisphereLight(0x9ee7dd, 0x071011, 1.75);
   scene.add(hemi);
 
-  const key = new THREE.DirectionalLight(0xffedd1, 4.1);
-  key.position.set(-5, 10, 8);
-  key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
-  key.shadow.camera.left = -18;
-  key.shadow.camera.right = 24;
-  key.shadow.camera.top = 16;
-  key.shadow.camera.bottom = -12;
-  key.shadow.bias = -0.0003;
-  scene.add(key);
+  keyLight = new THREE.DirectionalLight(0xffedd1, 4.1);
+  keyLight.position.set(-5, 10, 8);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.left = -18;
+  keyLight.shadow.camera.right = 24;
+  keyLight.shadow.camera.top = 16;
+  keyLight.shadow.camera.bottom = -12;
+  keyLight.shadow.bias = -0.0003;
+  scene.add(keyLight);
 
   const rangeLight = new THREE.PointLight(colors.slime, 28, 22, 1.8);
   rangeLight.position.set(19, 5, 0);
@@ -712,7 +1348,7 @@ function createBossMachine() {
   return group;
 }
 
-function createBossComponent(kind, health, base, index = 0) {
+function buildBossComponentTarget(kind, index = 0) {
   const group = new THREE.Group();
   group.name = `Boss-${kind}-${index}`;
   let geometry = new THREE.CylinderGeometry(0.72, 0.72, 0.26, 32);
@@ -728,29 +1364,48 @@ function createBossComponent(kind, health, base, index = 0) {
   group.add(core);
   const ring = mesh(new THREE.TorusGeometry(0.88, 0.09, 10, 32), materials.brass.clone(), [-0.12, 0, 0], [0, Math.PI / 2, 0]);
   group.add(ring);
-  group.position.copy(base);
-  scene.add(group);
+  group.visible = false;
   return {
     type: 'boss',
     kind,
     group,
-    base: base.clone(),
+    base: new THREE.Vector3(),
     radius: 0.92,
-    health,
-    maxHealth: health,
-    phase: Math.random() * Math.PI * 2,
+    health: 0,
+    maxHealth: 0,
+    phase: 0,
     age: 0,
+    openWindow: false,
     ring,
     core,
   };
 }
 
-function chooseTargetPosition(kind = 'panda') {
+function createBossComponent(kind, health, base, index = 0) {
+  const pool = bossTargetPools[kind];
+  const target = pool?.acquire() ?? null;
+  if (!target) return null;
+  target.group.name = `Boss-${kind}-${index}`;
+  target.group.position.copy(base);
+  target.group.visible = true;
+  target.base.copy(base);
+  target.radius = 0.92;
+  target.health = health;
+  target.maxHealth = health;
+  target.phase = Math.random() * Math.PI * 2;
+  target.age = 0;
+  target.openWindow = false;
+  target.ring.material.color.copy(materials.brass.color);
+  scene.add(target.group);
+  return target;
+}
+
+function chooseTargetPosition(kind = 'panda', result = new THREE.Vector3()) {
   const x = THREE.MathUtils.randFloat(13.5, game.wave === 1 ? 19.5 : 23.2);
   const z = THREE.MathUtils.randFloat(-7.2, 7.2);
   const highTarget = kind === 'frog' || game.wave > 1;
   const y = THREE.MathUtils.randFloat(kind === 'bear' ? 2.25 : 2.5, highTarget ? 4.5 : 3.7);
-  return new THREE.Vector3(x, y, z);
+  return result.set(x, y, z);
 }
 
 function currentEncounter() {
@@ -784,56 +1439,50 @@ function spawnTarget(requestedKind = null) {
 
 function spawnAnimal(kind) {
   const normalizedKind = kind === 'bunny' ? 'rabbit' : kind === 'otter' ? 'bear' : kind;
-  const group = createAnimalTarget(normalizedKind);
-  const base = chooseTargetPosition(normalizedKind);
-  group.position.copy(base);
-  group.rotation.y = 0;
-  scene.add(group);
+  const pool = animalTargetPools[normalizedKind];
+  const target = pool?.acquire() ?? null;
+  if (!target) return null;
+  chooseTargetPosition(normalizedKind, target.base);
+  target.group.position.copy(target.base);
+  target.group.rotation.y = 0;
+  target.group.visible = true;
+  scene.add(target.group);
 
   const feedRequired = normalizedKind === 'panda' ? 2 : 1;
-  const target = {
-    type: 'animal',
-    group,
-    base,
-    kind: normalizedKind,
-    radius: normalizedKind === 'panda' ? 1.12 : 1.02,
-    phase: Math.random() * Math.PI * 2,
-    speed: THREE.MathUtils.randFloat(0.7, 1.15) * (1 + game.wave * 0.08),
-    amplitude: normalizedKind === 'panda' ? 0.45 : THREE.MathUtils.randFloat(0.8, 1.65),
-    age: 0,
-    lifetime: THREE.MathUtils.randFloat(12.5, 17.5),
-    value: Math.round(115 + base.x * 5 + base.y * 14),
-    feedRequired,
-    feedProgress: 0,
-    mouthOpen: normalizedKind !== 'bear',
-    apexWindow: false,
-    shielded: false,
-    lane: Math.sign(base.z) || 1,
-  };
+  target.radius = normalizedKind === 'panda' ? 1.12 : 1.02;
+  target.phase = Math.random() * Math.PI * 2;
+  target.speed = THREE.MathUtils.randFloat(0.7, 1.15) * (1 + game.wave * 0.08);
+  target.amplitude = normalizedKind === 'panda' ? 0.45 : THREE.MathUtils.randFloat(0.8, 1.65);
+  target.age = 0;
+  target.lifetime = THREE.MathUtils.randFloat(12.5, 17.5);
+  target.value = Math.round(115 + target.base.x * 5 + target.base.y * 14);
+  target.feedRequired = feedRequired;
+  target.feedProgress = 0;
+  target.mouthOpen = normalizedKind !== 'bear';
+  target.apexWindow = false;
+  target.shielded = false;
+  target.lane = Math.sign(target.base.z) || 1;
   targets.push(target);
   return target;
 }
 
 function spawnHazard(kind) {
   if (!game.mission?.hazards?.includes(kind) && game.mode !== 'classic') return null;
-  const group = createHazardTarget(kind);
-  const base = chooseTargetPosition('hazard');
-  group.position.copy(base);
-  scene.add(group);
-  const target = {
-    type: 'hazard',
-    kind,
-    group,
-    base,
-    radius: kind === 'barrier-drone' ? 1.08 : 0.9,
-    phase: Math.random() * Math.PI * 2,
-    speed: kind === 'snack-thief' ? 1.65 : 1.05,
-    amplitude: THREE.MathUtils.randFloat(1.2, 2.4),
-    age: 0,
-    lifetime: THREE.MathUtils.randFloat(13, 19),
-    disabled: false,
-    interceptCooldown: THREE.MathUtils.randFloat(0.7, 1.6),
-  };
+  const pool = hazardTargetPools[kind];
+  const target = pool?.acquire() ?? null;
+  if (!target) return null;
+  chooseTargetPosition('hazard', target.base);
+  target.group.position.copy(target.base);
+  target.group.visible = true;
+  scene.add(target.group);
+  target.radius = kind === 'barrier-drone' ? 1.08 : 0.9;
+  target.phase = Math.random() * Math.PI * 2;
+  target.speed = kind === 'snack-thief' ? 1.65 : 1.05;
+  target.amplitude = THREE.MathUtils.randFloat(1.2, 2.4);
+  target.age = 0;
+  target.lifetime = THREE.MathUtils.randFloat(13, 19);
+  target.disabled = false;
+  target.interceptCooldown = THREE.MathUtils.randFloat(0.7, 1.6);
   targets.push(target);
   return target;
 }
@@ -842,24 +1491,65 @@ function removeObject(object) {
   if (object?.parent) object.parent.remove(object);
 }
 
+function getTargetPool(target) {
+  if (target?.type === 'animal') return animalTargetPools[target.kind] ?? null;
+  if (target?.type === 'hazard') return hazardTargetPools[target.kind] ?? null;
+  if (target?.type === 'boss') return bossTargetPools[target.kind] ?? null;
+  return null;
+}
+
+function releaseTargetObject(target) {
+  const pool = getTargetPool(target);
+  if (pool) return pool.release(target);
+  removeObject(target?.group);
+  return false;
+}
+
+function releaseParticle(particle) {
+  const index = particles.indexOf(particle);
+  if (index >= 0) particles.splice(index, 1);
+  return particlePool.release(particle);
+}
+
+function releaseParticleAt(index) {
+  const [particle] = particles.splice(index, 1);
+  return particle ? particlePool.release(particle) : false;
+}
+
+function releaseSplat(splat) {
+  const index = splats.indexOf(splat);
+  if (index >= 0) splats.splice(index, 1);
+  return splatPool.release(splat);
+}
+
+function releaseSplatAt(index) {
+  const [splat] = splats.splice(index, 1);
+  return splat ? splatPool.release(splat) : false;
+}
+
+function releaseBloomCharge(charge) {
+  const index = bloomCharges.indexOf(charge);
+  if (index >= 0) bloomCharges.splice(index, 1);
+  return bloomChargePool.release(charge);
+}
+
 function removeTarget(target) {
   const index = targets.indexOf(target);
   if (index >= 0) targets.splice(index, 1);
-  removeObject(target.group);
+  releaseTargetObject(target);
 }
 
 function clearRoundObjects() {
   clearActiveOrdnance();
-  for (const target of targets.splice(0)) removeObject(target.group);
-  for (const particle of particles.splice(0)) removeObject(particle.mesh);
-  for (const splat of splats.splice(0)) removeObject(splat.mesh);
+  for (const target of targets.splice(0)) releaseTargetObject(target);
+  for (const particle of particles.splice(0)) particlePool.release(particle);
+  for (const splat of splats.splice(0)) splatPool.release(splat);
   removeObject(bossMachine);
-  bossMachine = null;
 }
 
 function clearActiveOrdnance() {
-  for (const projectile of projectiles.splice(0)) removeObject(projectile.mesh);
-  for (const charge of bloomCharges.splice(0)) removeObject(charge.mesh);
+  for (const projectile of projectiles.splice(0)) projectilePool.release(projectile);
+  for (const charge of bloomCharges.splice(0)) bloomChargePool.release(charge);
   updateAmmoUI();
 }
 
@@ -1031,6 +1721,12 @@ function shoot(speed) {
     return;
   }
 
+  const projectile = projectilePool.acquire();
+  if (!projectile) {
+    toast('发射器负载过高，请稍后再试', 'warning');
+    return;
+  }
+
   game.lastShotAt = now;
   inventory.current -= 1;
   game.recoil = 1;
@@ -1040,55 +1736,56 @@ function shoot(speed) {
   maybeDeploySupplyCrate();
   updateAmmoUI();
 
-  const position = new THREE.Vector3();
-  const direction = new THREE.Vector3();
-  getMuzzleState(position, direction);
-
-  const projectileMesh = new THREE.Group();
   const projectileMaterial = ammoMaterials[ammoId] ?? materials.slime;
-  const core = mesh(projectileGeometry, projectileMaterial);
-  core.scale.set(1.18, 0.9, 0.9);
-  projectileMesh.add(core);
-  const tail = mesh(dropletGeometry, projectileMaterial, [-0.36, 0, 0]);
-  tail.scale.set(2.1, 0.85, 0.85);
-  projectileMesh.add(tail);
-  disableObjectShadows(projectileMesh);
-  projectileMesh.position.copy(position);
-  scene.add(projectileMesh);
-
+  getMuzzleState(projectile.position, projectile.velocity);
   const launchSpeed = speed * (ammo.projectile.speedMultiplier ?? 1);
-  projectiles.push({
-    mesh: projectileMesh,
-    position: position.clone(),
-    previous: position.clone(),
-    velocity: direction.clone().multiplyScalar(launchSpeed),
-    radius: ammo.projectile.radius ?? 0.29,
-    ammoId,
-    gravityMultiplier: ammo.projectile.gravityMultiplier ?? 1,
-    bouncesRemaining: ammo.projectile.bounceCount ?? 0,
-    bounces: 0,
-    hitSomething: false,
-    age: 0,
-  });
+  projectile.previous.copy(projectile.position);
+  projectile.velocity.multiplyScalar(launchSpeed);
+  projectile.radius = ammo.projectile.radius ?? 0.29;
+  projectile.ammoId = ammoId;
+  projectile.gravityMultiplier = ammo.projectile.gravityMultiplier ?? 1;
+  projectile.bouncesRemaining = ammo.projectile.bounceCount ?? 0;
+  projectile.bounces = 0;
+  projectile.hitSomething = false;
+  projectile.age = 0;
+  projectile.impactPoint = null;
+  projectile.core.material = projectileMaterial;
+  projectile.tail.material = projectileMaterial;
+  projectile.mesh.position.copy(projectile.position);
+  projectile.mesh.visible = true;
+  scene.add(projectile.mesh);
+  projectiles.push(projectile);
 
-  muzzleBurst(position, direction, projectileMaterial);
+  muzzleBurst(projectile.position, temp.a.copy(projectile.velocity).normalize(), projectileMaterial);
   playShotSound(launchSpeed);
   inputSystem?.vibrate(0.28, 70);
 }
 
 function muzzleBurst(position, direction, material = materials.slime) {
-  const count = settings?.accessibility?.reducedMotion ? 3 : 7;
+  const scaledCount = Math.max(1, Math.round(7 * runtimeGraphics.particleMultiplier));
+  const count = settings?.accessibility?.reducedMotion ? Math.min(3, scaledCount) : scaledCount;
+  const particleColor = material?.color ?? temp.color.setHex(colors.slime);
+  const particleEmissive = material?.emissive ?? particleColor;
   for (let i = 0; i < count; i += 1) {
-    const drop = mesh(dropletGeometry, material);
-    disableObjectShadows(drop);
-    drop.scale.setScalar(THREE.MathUtils.randFloat(0.45, 1.1));
-    drop.position.copy(position);
-    scene.add(drop);
-    const velocity = direction.clone().multiplyScalar(THREE.MathUtils.randFloat(2.5, 5.5));
-    velocity.x += THREE.MathUtils.randFloatSpread(1.4);
-    velocity.y += THREE.MathUtils.randFloatSpread(1.4);
-    velocity.z += THREE.MathUtils.randFloatSpread(1.4);
-    particles.push({ mesh: drop, velocity, life: THREE.MathUtils.randFloat(0.3, 0.62), age: 0, gravity: 4.5 });
+    const particle = particlePool.acquire();
+    if (!particle) break;
+    particle.mesh.geometry = dropletGeometry;
+    particle.material.color.copy(particleColor);
+    particle.material.emissive.copy(particleEmissive);
+    particle.material.emissiveIntensity = material?.emissiveIntensity ?? 0.75;
+    particle.material.opacity = 1;
+    particle.mesh.scale.setScalar(THREE.MathUtils.randFloat(0.45, 1.1));
+    particle.mesh.position.copy(position);
+    particle.mesh.visible = true;
+    particle.velocity.copy(direction).multiplyScalar(THREE.MathUtils.randFloat(2.5, 5.5));
+    particle.velocity.x += THREE.MathUtils.randFloatSpread(1.4);
+    particle.velocity.y += THREE.MathUtils.randFloatSpread(1.4);
+    particle.velocity.z += THREE.MathUtils.randFloatSpread(1.4);
+    particle.life = THREE.MathUtils.randFloat(0.3, 0.62);
+    particle.age = 0;
+    particle.gravity = 4.5;
+    scene.add(particle.mesh);
+    particles.push(particle);
   }
 }
 
@@ -1105,9 +1802,9 @@ function segmentSphereHit(a, b, center, radius) {
 }
 
 function removeProjectile(projectile) {
-  removeObject(projectile.mesh);
   const projectileIndex = projectiles.indexOf(projectile);
   if (projectileIndex >= 0) projectiles.splice(projectileIndex, 1);
+  return projectilePool.release(projectile);
 }
 
 function markProjectileHit(projectile) {
@@ -1144,9 +1841,9 @@ function hitTarget(target, projectile) {
 
   if (projectile.ammoId === 'adhesive-bloom' && target.type === 'animal') {
     markProjectileHit(projectile);
+    const charge = createBloomCharge(hitPosition, projectile, 0.42);
     removeProjectile(projectile);
-    createBloomCharge(hitPosition, projectile, 0.42);
-    toast('花苞已附着 · 再按 Shift / A 可立即绽放', 'success');
+    toast(charge ? '花苞已附着 · 再按 Shift / A 可立即绽放' : '花苞效果已达上限', charge ? 'success' : 'warning');
     return;
   }
 
@@ -1161,20 +1858,20 @@ function hitTarget(target, projectile) {
       return;
     }
     markProjectileHit(projectile);
-    removeProjectile(projectile);
     applyAnimalFeed(target, projectile, { bullseye, hitPosition, area: false });
+    removeProjectile(projectile);
     return;
   }
 
   if (target.type === 'hazard') {
-    removeProjectile(projectile);
     handleHazardHit(target, projectile, hitPosition);
+    removeProjectile(projectile);
     return;
   }
 
   if (target.type === 'boss') {
-    removeProjectile(projectile);
     handleBossHit(target, projectile, hitPosition, bullseye);
+    removeProjectile(projectile);
   }
 }
 
@@ -1377,26 +2074,31 @@ function targetIsBossShielded() {
 }
 
 function createBloomCharge(position, sourceProjectile, autoDelay = 1.15) {
-  const material = ammoMaterials['adhesive-bloom'];
-  const chargeMesh = new THREE.Group();
-  const bulb = mesh(new THREE.DodecahedronGeometry(0.35, 1), material);
-  const ring = mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 28), material, [0, 0, 0], [Math.PI / 2, 0, 0]);
-  chargeMesh.add(bulb, ring);
-  disableObjectShadows(chargeMesh);
-  chargeMesh.position.copy(position);
-  scene.add(chargeMesh);
-  bloomCharges.push({ mesh: chargeMesh, sourceProjectile, age: 0, armed: false, autoDelay, life: 10 });
+  const charge = bloomChargePool.acquire();
+  if (!charge) return null;
+  charge.sourceProjectile.ammoId = sourceProjectile?.ammoId ?? 'adhesive-bloom';
+  charge.sourceProjectile.bounces = sourceProjectile?.bounces ?? 0;
+  charge.sourceProjectile.hitSomething = Boolean(sourceProjectile?.hitSomething);
+  charge.age = 0;
+  charge.armed = false;
+  charge.autoDelay = autoDelay;
+  charge.life = 10;
+  charge.mesh.position.copy(position);
+  charge.mesh.visible = true;
+  scene.add(charge.mesh);
+  bloomCharges.push(charge);
+  return charge;
 }
 
 function detonateBloomCharge(charge) {
   if (!charge || !bloomCharges.includes(charge)) return;
   const position = charge.mesh.position.clone();
-  const fed = areaFeedAt(position, 2.45, charge.sourceProjectile, { bloom: true });
+  const sourceProjectile = { ...charge.sourceProjectile };
+  const fed = areaFeedAt(position, 2.45, sourceProjectile, { bloom: true });
   if (fed >= 2) game.stats.adhesiveMultiFeeds += 1;
   createImpactParticles(position, 0xffcf62, 22);
   addSplat(position, 0xffcf62);
-  removeObject(charge.mesh);
-  bloomCharges.splice(bloomCharges.indexOf(charge), 1);
+  releaseBloomCharge(charge);
   tone(520, 0.18, 'triangle', 0.04);
 }
 
@@ -1433,9 +2135,10 @@ function triggerSecondaryAction() {
     return true;
   }
   if (flying?.ammoId === 'adhesive-bloom') {
+    const charge = createBloomCharge(flying.position, flying, 0);
+    if (!charge) return false;
     removeProjectile(flying);
-    createBloomCharge(flying.position, flying, 0);
-    detonateBloomCharge(bloomCharges.at(-1));
+    detonateBloomCharge(charge);
     return true;
   }
   const charge = bloomCharges.find((entry) => entry.armed) ?? bloomCharges[0];
@@ -1447,51 +2150,55 @@ function triggerSecondaryAction() {
 }
 
 function createImpactParticles(position, color, count) {
-  const actualCount = settings?.accessibility?.reducedMotion ? Math.min(6, count) : count;
-  const material = new THREE.MeshStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: 0.75,
-    roughness: 0.32,
-  });
+  const scaledCount = Math.max(1, Math.round(count * runtimeGraphics.particleMultiplier));
+  const actualCount = settings?.accessibility?.reducedMotion ? Math.min(6, scaledCount) : scaledCount;
+  const useLowDetail = runtimeGraphics.particleQuality === 'low'
+    || camera.position.distanceToSquared(position) >= DISTANT_PARTICLE_LOD_DISTANCE_SQ;
+  const particleGeometry = useLowDetail ? dropletLowGeometry : dropletGeometry;
   for (let i = 0; i < actualCount; i += 1) {
-    const drop = mesh(dropletGeometry, material);
-    disableObjectShadows(drop);
-    drop.scale.setScalar(THREE.MathUtils.randFloat(0.5, 1.55));
-    drop.position.copy(position);
-    scene.add(drop);
-    const velocity = new THREE.Vector3(
+    const particle = particlePool.acquire();
+    if (!particle) break;
+    particle.mesh.geometry = particleGeometry;
+    particle.material.color.setHex(color);
+    particle.material.emissive.setHex(color);
+    particle.material.emissiveIntensity = 0.75;
+    particle.material.opacity = 1;
+    particle.mesh.scale.setScalar(THREE.MathUtils.randFloat(0.5, 1.55));
+    particle.mesh.position.copy(position);
+    particle.mesh.visible = true;
+    particle.velocity.set(
       THREE.MathUtils.randFloat(-2.5, 1.5),
       THREE.MathUtils.randFloat(1.2, 5.8),
       THREE.MathUtils.randFloatSpread(5.2),
     );
-    particles.push({ mesh: drop, velocity, life: THREE.MathUtils.randFloat(0.55, 1.2), age: 0, gravity: 8 });
+    particle.life = THREE.MathUtils.randFloat(0.55, 1.2);
+    particle.age = 0;
+    particle.gravity = 8;
+    scene.add(particle.mesh);
+    particles.push(particle);
   }
 }
 
 function addSplat(position, color = colors.slime) {
-  const material = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.66,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const splat = mesh(new THREE.CircleGeometry(THREE.MathUtils.randFloat(0.34, 0.7), 18), material);
-  disableObjectShadows(splat);
-  splat.position.copy(position);
-  splat.position.y = 0.025;
-  splat.rotation.x = -Math.PI / 2;
-  splat.rotation.z = Math.random() * Math.PI;
-  splat.scale.y = THREE.MathUtils.randFloat(0.55, 1.15);
-  splat.castShadow = false;
-  splat.receiveShadow = false;
-  scene.add(splat);
-  splats.push({ mesh: splat, age: 0, life: 8 });
-  if (splats.length > 24) {
-    const old = splats.shift();
-    removeObject(old.mesh);
-  }
+  const splatLimit = Math.min(runtimeGraphics.splatLimit, splatPool.capacity);
+  if (splatLimit <= 0) return null;
+  while (splats.length >= splatLimit) releaseSplat(splats[0]);
+  const splat = splatPool.acquire();
+  if (!splat) return null;
+  const radius = THREE.MathUtils.randFloat(0.34, 0.7);
+  splat.material.color.setHex(color);
+  splat.material.opacity = 0.66;
+  splat.mesh.position.copy(position);
+  splat.mesh.position.y = 0.025;
+  splat.mesh.rotation.x = -Math.PI / 2;
+  splat.mesh.rotation.z = Math.random() * Math.PI;
+  splat.mesh.scale.set(radius, radius * THREE.MathUtils.randFloat(0.55, 1.15), 1);
+  splat.mesh.visible = true;
+  splat.age = 0;
+  splat.life = 8;
+  scene.add(splat.mesh);
+  splats.push(splat);
+  return splat;
 }
 
 function pulseHitMarker(hazard) {
@@ -1531,11 +2238,12 @@ function updateProjectiles(dt) {
     ));
     if (thief && projectile.ammoId === 'nutrient-gel') {
       thief.interceptCooldown = 3.2;
+      temp.d.copy(projectile.position);
       removeProjectile(projectile);
       game.combo = 0;
       game.stability = Math.max(0, game.stability - 4);
       toast('偷食无人机拦截了飞行补给 · 稳定度 -4%', 'danger');
-      createImpactParticles(projectile.position, 0xff934f, 12);
+      createImpactParticles(temp.d, 0xff934f, 12);
       playHazardSound();
       checkMissionFailure();
       continue;
@@ -1581,9 +2289,9 @@ function updateProjectiles(dt) {
       if (projectile.ammoId === 'adhesive-bloom' && (hitGround || hitSideWall || hitBackWall)) {
         const position = projectile.position.clone();
         position.y = Math.max(0.08, position.y);
+        const charge = createBloomCharge(position, projectile);
         removeProjectile(projectile);
-        createBloomCharge(position, projectile);
-        toast('花苞已预埋 · 将自动绽放', 'success');
+        toast(charge ? '花苞已预埋 · 将自动绽放' : '花苞效果已达上限', charge ? 'success' : 'warning');
         continue;
       }
       if (hitGround) {
@@ -1609,6 +2317,7 @@ function updateTargets(dt) {
   }
 
   for (const charge of [...bloomCharges]) {
+    if (!bloomCharges.includes(charge)) continue;
     charge.age += dt;
     charge.mesh.rotation.y += dt * 1.7;
     charge.mesh.scale.setScalar(1 + Math.sin(charge.age * 8) * 0.06);
@@ -1736,8 +2445,7 @@ function updateParticles(dt) {
     particle.mesh.scale.multiplyScalar(Math.max(0.96, 1 - dt * 1.8));
     if (particle.mesh.material?.transparent) particle.mesh.material.opacity = remaining;
     if (particle.age >= particle.life) {
-      removeObject(particle.mesh);
-      particles.splice(i, 1);
+      releaseParticleAt(i);
     }
   }
 
@@ -1746,8 +2454,7 @@ function updateParticles(dt) {
     splat.age += dt;
     if (splat.age > splat.life - 2) splat.mesh.material.opacity = Math.max(0, (splat.life - splat.age) / 2 * 0.66);
     if (splat.age >= splat.life) {
-      removeObject(splat.mesh);
-      splats.splice(i, 1);
+      releaseSplatAt(i);
     }
   }
 }
@@ -1982,20 +2689,25 @@ function setupBossPhase(phaseIndex) {
   game.bossPhase = phaseIndex;
   game.bossPhaseHits = 0;
   if (!bossMachine) bossMachine = createBossMachine();
+  else if (!bossMachine.parent) scene.add(bossMachine);
   const center = new THREE.Vector3(18.4, 3.4, 0);
   if (phaseIndex === 0) {
     game.bossPhaseTarget = 6;
-    targets.push(createBossComponent('feed-port', 6, center));
+    const target = createBossComponent('feed-port', 6, center);
+    if (target) targets.push(target);
     toast('Boss 阶段 1：旋转投食口 · 绿色窗口时命中', 'warning');
   } else if (phaseIndex === 1) {
     game.bossPhaseTarget = 8;
-    targets.push(createBossComponent('storage-tank', 4, center.clone().add(new THREE.Vector3(0.2, 0.2, -2.2)), 0));
-    targets.push(createBossComponent('storage-tank', 4, center.clone().add(new THREE.Vector3(0.2, 0.2, 2.2)), 1));
+    const leftTank = createBossComponent('storage-tank', 4, center.clone().add(new THREE.Vector3(0.2, 0.2, -2.2)), 0);
+    const rightTank = createBossComponent('storage-tank', 4, center.clone().add(new THREE.Vector3(0.2, 0.2, 2.2)), 1);
+    if (leftTank) targets.push(leftTank);
+    if (rightTank) targets.push(rightTank);
     refillSpecialAmmo('adhesive-bloom');
     toast('Boss 阶段 2：双侧储粮罐 · 黏附花苞效率翻倍', 'warning');
   } else if (phaseIndex === 2) {
     game.bossPhaseTarget = 10;
-    targets.push(createBossComponent('mobile-core', 10, center));
+    const target = createBossComponent('mobile-core', 10, center);
+    if (target) targets.push(target);
     refillSpecialAmmo('bounce-bubble');
     spawnHazard('barrier-drone');
     game.spawnTimer = 4.8;
@@ -2460,6 +3172,10 @@ function populateSettingsForm(source) {
   const value = normalizeSettings(source);
   const setValue = (id, next) => { if ($(id)) $(id).value = String(next); };
   const setChecked = (id, next) => { if ($(id)) $(id).checked = Boolean(next); };
+  setValue('setting-quality-preset', value.graphics.qualityPreset);
+  setChecked('setting-dynamic-render-scale', value.graphics.dynamicRenderScale);
+  setValue('setting-shadow-quality', value.graphics.shadowQuality);
+  setValue('setting-particle-quality', value.graphics.particleQuality);
   setValue('setting-render-scale', value.graphics.renderScale);
   setValue('setting-ui-scale', Math.round(value.accessibility.uiScale * 100));
   setChecked('setting-high-contrast', value.accessibility.highContrast);
@@ -2505,6 +3221,10 @@ function readSettingsForm() {
       reducedMotion: Boolean($('setting-reduced-motion')?.checked),
     },
     graphics: {
+      qualityPreset: $('setting-quality-preset')?.value ?? DEFAULT_SETTINGS.graphics.qualityPreset,
+      dynamicRenderScale: Boolean($('setting-dynamic-render-scale')?.checked),
+      shadowQuality: $('setting-shadow-quality')?.value ?? DEFAULT_SETTINGS.graphics.shadowQuality,
+      particleQuality: $('setting-particle-quality')?.value ?? DEFAULT_SETTINGS.graphics.particleQuality,
       renderScale: numberValue('setting-render-scale'),
     },
   });
@@ -2513,12 +3233,30 @@ function readSettingsForm() {
 function applyRuntimeSettings(nextSettings) {
   settings = applySettings(nextSettings, {
     inputSystem,
-    renderer,
     trajectory,
-    devicePixelRatio: window.devicePixelRatio,
-    maxDevicePixelRatio: 2,
+    setQualityPreset: setRuntimeQualityPreset,
+    setDynamicRenderScale: setRuntimeDynamicRenderScale,
+    setShadowQuality: setRuntimeShadowQuality,
+    setParticleQuality: setRuntimeParticleQuality,
+    setRenderScale: setRuntimeUserRenderScale,
   });
+  resetDynamicRenderScale();
   resize();
+}
+
+function applyQualityPresetToSettingsForm(qualityPreset) {
+  const profile = RUNTIME_QUALITY_PRESETS[qualityPreset];
+  if (!profile) return;
+  if ($('setting-shadow-quality')) $('setting-shadow-quality').value = profile.shadowQuality;
+  if ($('setting-particle-quality')) $('setting-particle-quality').value = profile.particleQuality;
+  if ($('setting-render-scale')) $('setting-render-scale').value = String(profile.renderScale);
+}
+
+function handleSettingsFormInput(event) {
+  if (event.target?.id === 'setting-quality-preset') {
+    applyQualityPresetToSettingsForm(event.target.value);
+  }
+  updateSettingsOutputs();
 }
 
 function updateSettingsOutputs() {
@@ -3071,7 +3809,7 @@ function bindEvents() {
     else if (moduleOption) cycleLoadoutModule();
   });
 
-  dom.settingsForm.addEventListener('input', updateSettingsOutputs);
+  dom.settingsForm.addEventListener('input', handleSettingsFormInput);
   dom.settingsForm.addEventListener('submit', (event) => {
     event.preventDefault();
     settings = saveSettings(readSettingsForm());
@@ -3153,11 +3891,73 @@ function resize() {
   const rect = dom.shell.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
-  const renderScale = settings?.graphics?.renderScale ?? 1;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio * renderScale, 2));
+  const renderScale = runtimeGraphics.actualRenderScale;
+  runtimeGraphics.pixelRatio = Math.min(window.devicePixelRatio * renderScale, 2);
+  renderer.setPixelRatio(runtimeGraphics.pixelRatio);
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+}
+
+function ensurePerformanceHud() {
+  if (performanceHudElement) return performanceHudElement;
+  const element = document.createElement('pre');
+  element.id = 'performance-debug-hud';
+  element.setAttribute('aria-live', 'off');
+  element.style.cssText = [
+    'position:fixed',
+    'top:12px',
+    'right:12px',
+    'z-index:9999',
+    'min-width:310px',
+    'margin:0',
+    'padding:12px 14px',
+    'border:1px solid rgba(121,255,154,.48)',
+    'border-radius:8px',
+    'background:rgba(3,13,14,.88)',
+    'color:#d9eee4',
+    'font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace',
+    'pointer-events:none',
+    'white-space:pre',
+    'box-shadow:0 12px 30px rgba(0,0,0,.35)',
+  ].join(';');
+  element.hidden = true;
+  document.body.append(element);
+  performanceHudElement = element;
+  return element;
+}
+
+function updatePerformanceHud(snapshot = latestPerformanceSnapshot ?? performanceMonitor.snapshot()) {
+  if (!performanceHudEnabled) return;
+  const element = ensurePerformanceHud();
+  const pools = getRuntimePoolStats();
+  const exceeded = Object.entries(snapshot.budgetStatus)
+    .filter(([, status]) => status.state === 'exceeded' || status.state === 'pending')
+    .map(([name, status]) => `${name}:${status.state}`)
+    .join(' · ');
+  const lines = [
+    'SLOP ZOO PERF · F7 隐藏',
+    `FPS ${snapshot.fps.average.toFixed(1)} · 1% LOW ${snapshot.fps.onePercentLow.toFixed(1)}`,
+    `FRAME ${snapshot.frameTimeMs.average.toFixed(2)} ms · P95 ${snapshot.frameTimeMs.p95.toFixed(2)} ms`,
+    `SCALE ${(runtimeGraphics.actualRenderScale * 100).toFixed(0)}% · USER ${(runtimeGraphics.userRenderScale * 100).toFixed(0)}% · DRS ${runtimeGraphics.dynamicRenderScale ? 'ON' : 'OFF'}`,
+    `QUALITY ${runtimeGraphics.qualityPreset.toUpperCase()} · SHADOW ${runtimeGraphics.shadowQuality.toUpperCase()} · FX ${runtimeGraphics.particleQuality.toUpperCase()}`,
+    `DRAW ${snapshot.render.current.calls} · TRI ${Math.round(snapshot.render.current.triangles).toLocaleString('en-US')}`,
+    `GEO ${snapshot.memory.current.geometries} · TEX ${snapshot.memory.current.textures}`,
+    `ENT ${snapshot.entities.current.total} · TGT ${targets.length} · PROJ ${projectiles.length} · FX ${particles.length}`,
+    ...Object.entries(pools).map(([name, stats]) => (
+      `${name.padEnd(12)} ${String(stats.active).padStart(3)}/${String(stats.capacity).padEnd(3)} created ${String(stats.created).padStart(3)} reuse ${String(stats.reused).padStart(5)}`
+    )),
+    exceeded ? `BUDGET ${exceeded}` : 'BUDGET OK',
+  ];
+  element.textContent = lines.join('\n');
+}
+
+function setPerformanceHud(enabled) {
+  performanceHudEnabled = Boolean(enabled);
+  const element = ensurePerformanceHud();
+  element.hidden = !performanceHudEnabled;
+  if (performanceHudEnabled) updatePerformanceHud();
+  return performanceHudEnabled;
 }
 
 function renderLoop(now) {
@@ -3177,6 +3977,17 @@ function renderLoop(now) {
   }
   updateAnimation(rawDelta);
   renderer.render(scene, camera);
+  const sampledSnapshot = performanceMonitor.recordFrame(
+    Math.max(rawDelta, 0.0001),
+    renderer.info,
+    getRuntimeEntityCounts(),
+  );
+  if (sampledSnapshot) {
+    latestPerformanceSnapshot = sampledSnapshot;
+    performanceMonitor.drainAlerts();
+    sampleDynamicRenderScale(sampledSnapshot);
+    updatePerformanceHud(sampledSnapshot);
+  }
 }
 
 async function init() {
@@ -3233,8 +4044,44 @@ function installDebugApi() {
       feeds: game.feeds,
       threatProgress: game.threatProgress,
       bossPhase: game.bossPhase,
+      entities: getRuntimeEntityCounts(),
+      graphics: getRuntimeGraphicsReport(),
       unlocked: MISSIONS.filter((mission) => isMissionUnlocked(mission.id, saveData)).map((mission) => mission.id),
     }),
+    getPerformanceReport,
+    getPoolStats: getRuntimePoolStats,
+    runPoolStressTest,
+    setPerformanceHud,
+    resetPerformanceMonitor: () => {
+      performanceAlertLog.length = 0;
+      latestPerformanceSnapshot = null;
+      dynamicResolutionController.reset();
+      runtimeGraphics.lastDynamicDecision = null;
+      return {
+        performance: performanceMonitor.reset(),
+        graphics: getRuntimeGraphicsReport(),
+      };
+    },
+    sampleDynamicResolution: (metrics) => {
+      const decision = sampleDynamicRenderScale({ metrics });
+      return { decision, graphics: getRuntimeGraphicsReport() };
+    },
+    stressVisualEffects: (options = {}) => {
+      if (game.phase !== 'playing') return { ok: false, reason: 'start a mission before visual stress' };
+      const bursts = THREE.MathUtils.clamp(Math.trunc(Number(options.bursts) || 24), 1, 120);
+      const particlesPerBurst = THREE.MathUtils.clamp(Math.trunc(Number(options.particlesPerBurst) || 18), 1, 64);
+      const palette = [colors.slime, colors.orange, colors.cyan, 0xffcf62, 0xc76dff];
+      for (let index = 0; index < bursts; index += 1) {
+        const position = new THREE.Vector3(
+          8 + (index % 8) * 1.8,
+          0.4 + (index % 4) * 0.55,
+          -6 + (index % 7) * 1.8,
+        );
+        createImpactParticles(position, palette[index % palette.length], particlesPerBurst);
+        if (index % 3 === 0) addSplat(position, palette[index % palette.length]);
+      }
+      return { ok: true, bursts, particlesPerBurst, report: getPerformanceReport() };
+    },
     startMission: (missionId) => {
       game.selectedMissionId = missionId;
       startMission(missionId);
@@ -3264,11 +4111,71 @@ function installDebugApi() {
       return true;
     },
   };
-  window.__SLOP_ZOO_DEBUG__ = debugApi;
+  if (Object.isExtensible(window)) window.__SLOP_ZOO_DEBUG__ = debugApi;
+
+  let debugOutput = document.getElementById('slop-zoo-debug-output');
+  if (!debugOutput) {
+    debugOutput = document.createElement('output');
+    debugOutput.id = 'slop-zoo-debug-output';
+    debugOutput.hidden = true;
+    document.body.append(debugOutput);
+  }
+  let debugRequest = document.getElementById('slop-zoo-debug-request');
+  if (!debugRequest) {
+    debugRequest = document.createElement('textarea');
+    debugRequest.id = 'slop-zoo-debug-request';
+    document.body.append(debugRequest);
+  }
+  debugRequest.hidden = false;
+  debugRequest.setAttribute('aria-hidden', 'true');
+  debugRequest.tabIndex = -1;
+  debugRequest.style.cssText = 'position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+  let debugRunButton = document.getElementById('slop-zoo-debug-run');
+  if (!debugRunButton) {
+    debugRunButton = document.createElement('button');
+    debugRunButton.id = 'slop-zoo-debug-run';
+    debugRunButton.type = 'button';
+    debugRunButton.hidden = true;
+    document.body.append(debugRunButton);
+  }
+  const writeDebugResult = (requestId, ok, value) => {
+    debugOutput.textContent = JSON.stringify({ requestId, ok, value });
+    debugOutput.dataset.requestId = String(requestId ?? '');
+    window.dispatchEvent(new CustomEvent('slopzoo:debug-response', {
+      detail: { requestId, ok },
+    }));
+  };
+  const handleDebugRequest = (request = {}) => {
+    const { requestId = '', action, args = [] } = request;
+    try {
+      if (typeof debugApi[action] !== 'function') throw new Error(`Unknown debug action: ${action}`);
+      const result = debugApi[action](...(Array.isArray(args) ? args : [args]));
+      if (result && typeof result.then === 'function') {
+        result.then(
+          (value) => writeDebugResult(requestId, true, value),
+          (error) => writeDebugResult(requestId, false, { message: error?.message ?? String(error) }),
+        );
+      } else {
+        writeDebugResult(requestId, true, result);
+      }
+    } catch (error) {
+      writeDebugResult(requestId, false, { message: error?.message ?? String(error) });
+    }
+  };
+  window.addEventListener('slopzoo:debug-request', (event) => handleDebugRequest(event.detail));
+  debugRunButton.addEventListener('click', () => {
+    try {
+      handleDebugRequest(JSON.parse(debugRequest.value || '{}'));
+    } catch (error) {
+      writeDebugResult('', false, { message: error?.message ?? String(error) });
+    }
+  });
+  debugRequest.addEventListener('input', () => debugRunButton.click());
   window.addEventListener('keydown', (event) => {
-    if (event.repeat || !['F8', 'F9'].includes(event.code)) return;
+    if (event.repeat || !['F7', 'F8', 'F9'].includes(event.code)) return;
     event.preventDefault();
-    if (event.code === 'F8') debugApi.completeMission();
+    if (event.code === 'F7') debugApi.setPerformanceHud(!performanceHudEnabled);
+    else if (event.code === 'F8') debugApi.completeMission();
     else debugApi.failMission();
   });
 }

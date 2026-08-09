@@ -296,6 +296,35 @@
           <div class="settings-grid">
             <fieldset class="settings-group">
               <legend><span>01</span> 显示与界面</legend>
+              <label class="setting-row setting-row--select" for="setting-quality-preset">
+                <span><strong>画质预设</strong><small>统一调整阴影、粒子与渲染负载</small></span>
+                <select id="setting-quality-preset" name="qualityPreset">
+                  <option value="low">低</option>
+                  <option value="medium" selected>中（推荐）</option>
+                  <option value="high">高</option>
+                </select>
+              </label>
+              <label class="setting-row setting-row--toggle" for="setting-dynamic-render-scale">
+                <span><strong>动态渲染比例</strong><small>压力升高时自动降低精度以稳定帧率</small></span>
+                <span class="toggle"><input id="setting-dynamic-render-scale" name="dynamicRenderScale" type="checkbox" checked /><i aria-hidden="true"></i></span>
+              </label>
+              <label class="setting-row setting-row--select" for="setting-shadow-quality">
+                <span><strong>阴影质量</strong><small>高质量阴影会增加 GPU 负载</small></span>
+                <select id="setting-shadow-quality" name="shadowQuality">
+                  <option value="off">关闭</option>
+                  <option value="low">低</option>
+                  <option value="medium" selected>中</option>
+                  <option value="high">高</option>
+                </select>
+              </label>
+              <label class="setting-row setting-row--select" for="setting-particle-quality">
+                <span><strong>粒子质量</strong><small>控制命中、炮口与环境特效密度</small></span>
+                <select id="setting-particle-quality" name="particleQuality">
+                  <option value="low">低</option>
+                  <option value="medium" selected>中</option>
+                  <option value="high">高</option>
+                </select>
+              </label>
               <label class="setting-row setting-row--select" for="setting-render-scale">
                 <span><strong>渲染精度</strong><small>降低可提升低配设备帧率</small></span>
                 <select id="setting-render-scale" name="renderScale">

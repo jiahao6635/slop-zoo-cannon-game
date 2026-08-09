@@ -1,5 +1,9 @@
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 export const SETTINGS_STORAGE_KEY = 'slop-zoo-cannon-settings';
+
+export const QUALITY_PRESETS = deepFreeze(['low', 'medium', 'high']);
+export const SHADOW_QUALITIES = deepFreeze(['off', 'low', 'medium', 'high']);
+export const PARTICLE_QUALITIES = deepFreeze(['low', 'medium', 'high']);
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -42,6 +46,10 @@ export const DEFAULT_SETTINGS = deepFreeze({
     reducedMotion: false,
   },
   graphics: {
+    qualityPreset: 'medium',
+    dynamicRenderScale: true,
+    shadowQuality: 'medium',
+    particleQuality: 'medium',
     renderScale: 1,
   },
 });
@@ -49,6 +57,10 @@ export const DEFAULT_SETTINGS = deepFreeze({
 function finiteNumber(value, fallback, min, max) {
   const number = Number(value);
   return Number.isFinite(number) ? clamp(number, min, max) : fallback;
+}
+
+function enumValue(value, allowedValues, fallback) {
+  return typeof value === 'string' && allowedValues.includes(value) ? value : fallback;
 }
 
 function migrateSettings(raw) {
@@ -89,6 +101,10 @@ function migrateSettings(raw) {
     },
     graphics: {
       ...(raw.graphics || {}),
+      qualityPreset: raw.graphics?.qualityPreset ?? raw.qualityPreset,
+      dynamicRenderScale: raw.graphics?.dynamicRenderScale ?? raw.dynamicRenderScale,
+      shadowQuality: raw.graphics?.shadowQuality ?? raw.shadowQuality,
+      particleQuality: raw.graphics?.particleQuality ?? raw.particleQuality,
       renderScale: raw.graphics?.renderScale ?? raw.renderScale,
     },
     version: SETTINGS_VERSION,
@@ -169,6 +185,24 @@ export function normalizeSettings(settings = {}) {
         : DEFAULT_SETTINGS.accessibility.reducedMotion,
     },
     graphics: {
+      qualityPreset: enumValue(
+        source.graphics?.qualityPreset,
+        QUALITY_PRESETS,
+        DEFAULT_SETTINGS.graphics.qualityPreset,
+      ),
+      dynamicRenderScale: typeof source.graphics?.dynamicRenderScale === 'boolean'
+        ? source.graphics.dynamicRenderScale
+        : DEFAULT_SETTINGS.graphics.dynamicRenderScale,
+      shadowQuality: enumValue(
+        source.graphics?.shadowQuality,
+        SHADOW_QUALITIES,
+        DEFAULT_SETTINGS.graphics.shadowQuality,
+      ),
+      particleQuality: enumValue(
+        source.graphics?.particleQuality,
+        PARTICLE_QUALITIES,
+        DEFAULT_SETTINGS.graphics.particleQuality,
+      ),
       renderScale: finiteNumber(
         source.graphics?.renderScale,
         DEFAULT_SETTINGS.graphics.renderScale,
@@ -292,6 +326,10 @@ export function applySettings(settings, adapters = {}) {
     );
     adapters.renderer.setPixelRatio(devicePixelRatio * normalized.graphics.renderScale);
   }
+  adapters.setQualityPreset?.(normalized.graphics.qualityPreset);
+  adapters.setDynamicRenderScale?.(normalized.graphics.dynamicRenderScale);
+  adapters.setShadowQuality?.(normalized.graphics.shadowQuality);
+  adapters.setParticleQuality?.(normalized.graphics.particleQuality);
   adapters.setRenderScale?.(normalized.graphics.renderScale);
   adapters.onApplied?.(normalized);
   dispatchAppliedEvent(adapters.eventTarget || root, normalized);

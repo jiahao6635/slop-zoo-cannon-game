@@ -7,7 +7,14 @@ import {
   isMissionUnlocked,
   recordMissionResult,
 } from '../src/systems/saveSystem.js';
-import { DEFAULT_SETTINGS, normalizeSettings } from '../src/systems/settingsSystem.js';
+import {
+  DEFAULT_SETTINGS,
+  PARTICLE_QUALITIES,
+  QUALITY_PRESETS,
+  SETTINGS_VERSION,
+  SHADOW_QUALITIES,
+  normalizeSettings,
+} from '../src/systems/settingsSystem.js';
 
 test('vertical-slice content is internally valid', () => {
   assert.deepEqual(validateGameContent(), []);
@@ -81,7 +88,13 @@ test('settings normalization clamps unsafe values and preserves accessibility ch
     controls: { gamepadDeadzone: 2, vibration: -1 },
     gameplay: { trajectoryMode: 'off', aimAssist: 5, cameraShake: -1 },
     accessibility: { uiScale: 1.2, highContrast: true, reducedMotion: true },
-    graphics: { renderScale: 10 },
+    graphics: {
+      qualityPreset: 'ultra',
+      dynamicRenderScale: 'false',
+      shadowQuality: 'cinematic',
+      particleQuality: 'maximum',
+      renderScale: 10,
+    },
   });
 
   assert.equal(normalized.audio.masterVolume, 1);
@@ -96,6 +109,52 @@ test('settings normalization clamps unsafe values and preserves accessibility ch
     highContrast: true,
     reducedMotion: true,
   });
-  assert.equal(normalized.graphics.renderScale, 1.5);
+  assert.deepEqual(normalized.graphics, {
+    qualityPreset: 'medium',
+    dynamicRenderScale: true,
+    shadowQuality: 'medium',
+    particleQuality: 'medium',
+    renderScale: 1.5,
+  });
   assert.equal(DEFAULT_SETTINGS.accessibility.uiScale, 1);
+});
+
+test('graphics quality settings accept only supported presets and strict booleans', () => {
+  const normalized = normalizeSettings({
+    graphics: {
+      qualityPreset: 'high',
+      dynamicRenderScale: false,
+      shadowQuality: 'off',
+      particleQuality: 'low',
+      renderScale: 0.75,
+    },
+  });
+
+  assert.equal(SETTINGS_VERSION, 2);
+  assert.deepEqual(QUALITY_PRESETS, ['low', 'medium', 'high']);
+  assert.deepEqual(SHADOW_QUALITIES, ['off', 'low', 'medium', 'high']);
+  assert.deepEqual(PARTICLE_QUALITIES, ['low', 'medium', 'high']);
+  assert.deepEqual(normalized.graphics, {
+    qualityPreset: 'high',
+    dynamicRenderScale: false,
+    shadowQuality: 'off',
+    particleQuality: 'low',
+    renderScale: 0.75,
+  });
+});
+
+test('version 1 graphics settings migrate without losing the saved render scale', () => {
+  const normalized = normalizeSettings({
+    version: 1,
+    graphics: { renderScale: 1.25 },
+  });
+
+  assert.equal(normalized.version, SETTINGS_VERSION);
+  assert.deepEqual(normalized.graphics, {
+    qualityPreset: 'medium',
+    dynamicRenderScale: true,
+    shadowQuality: 'medium',
+    particleQuality: 'medium',
+    renderScale: 1.25,
+  });
 });
