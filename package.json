@@ -1,0 +1,41 @@
+{
+  "name": "slop-zoo-cannon-game",
+  "version": "1.0.0",
+  "description": "A browser-based 3D arcade game built with Three.js, Vite and Blender.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "jiahao6635",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiahao6635/slop-zoo-cannon-game.git"
+  },
+  "homepage": "https://jiahao6635.github.io/slop-zoo-cannon-game/",
+  "bugs": {
+    "url": "https://github.com/jiahao6635/slop-zoo-cannon-game/issues"
+  },
+  "keywords": [
+    "threejs",
+    "blender",
+    "webgl",
+    "browser-game",
+    "3d-game",
+    "gltf"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "sanitize:assets": "node tools/sanitize_assets.mjs",
+    "export:assets": "node tools/export_assets.mjs"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "vite": "8.2.1"
+  }
+}

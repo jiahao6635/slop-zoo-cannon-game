@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="黏液动物园：补给炮台——一款发射果冻补给、拯救黏液生物的 3D 街机游戏。"
+    />
+    <meta name="theme-color" content="#061b1c" />
+    <title>黏液动物园：补给炮台</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="game-shell" aria-label="黏液动物园 3D 游戏区域">
+      <canvas id="game-canvas" aria-label="3D 游戏画面" tabindex="0"></canvas>
+
+      <div class="ambient-vignette" aria-hidden="true"></div>
+      <div class="corner-bracket corner-bracket--tl" aria-hidden="true"></div>
+      <div class="corner-bracket corner-bracket--tr" aria-hidden="true"></div>
+      <div class="corner-bracket corner-bracket--bl" aria-hidden="true"></div>
+      <div class="corner-bracket corner-bracket--br" aria-hidden="true"></div>
+
+      <section id="loading-screen" class="screen screen--loading" aria-live="polite">
+        <div class="loader-mark" aria-hidden="true">
+          <span class="loader-mark__core"></span>
+          <span class="loader-mark__orbit"></span>
+          <span class="loader-mark__dot"></span>
+        </div>
+        <p class="eyebrow">ZOO SYSTEM // BOOT SEQUENCE</p>
+        <h1 class="loading-title">调配黏液补给中</h1>
+        <div
+          class="loading-track"
+          role="progressbar"
+          aria-label="游戏加载进度"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <span id="loading-progress"></span>
+        </div>
+        <p class="loading-status">CALIBRATING SUPPLY CANNON…</p>
+      </section>
+
+      <section id="start-screen" class="screen screen--start" aria-labelledby="game-title">
+        <div class="start-layout">
+          <div class="title-block">
+            <p class="eyebrow"><span class="signal-dot"></span> SECTOR 07 // FEEDING EMERGENCY</p>
+            <h1 id="game-title">
+              <span>黏液动物园</span>
+              <strong>补给炮台</strong>
+            </h1>
+            <p class="game-tagline">瞄准。蓄力。把果冻补给送到每一张嗷嗷待哺的嘴里。</p>
+
+            <button id="start-button" class="primary-button" type="button">
+              <span class="primary-button__icon" aria-hidden="true">▶</span>
+              <span>启动炮台</span>
+              <small>START SHIFT</small>
+            </button>
+          </div>
+
+          <aside class="panel briefing-card" aria-label="任务简报">
+            <div class="panel__header">
+              <span class="panel__index">01</span>
+              <div>
+                <p class="eyebrow">KEEPERS' BRIEF</p>
+                <h2>今日饲养简报</h2>
+              </div>
+              <span class="status-chip">LIVE</span>
+            </div>
+            <p class="briefing-copy">
+              黏液小兽们正涌向饲养环廊。发射营养果冻弹，连续命中可启动连击加成。
+            </p>
+            <ul class="controls-list">
+              <li>
+                <span class="keycap keycap--wide">移动</span>
+                <span>鼠标 / 触摸</span>
+                <small>瞄准</small>
+              </li>
+              <li>
+                <span class="keycap keycap--wide">按住</span>
+                <span>鼠标左键</span>
+                <small>蓄力</small>
+              </li>
+              <li>
+                <span class="keycap keycap--wide">松开</span>
+                <span>鼠标左键</span>
+                <small>发射</small>
+              </li>
+              <li>
+                <span class="keycap">P</span>
+                <span>暂停轮班</span>
+                <small>PAUSE</small>
+              </li>
+            </ul>
+          </aside>
+        </div>
+
+        <div class="start-footer" aria-hidden="true">
+          <span>MK-IV GOO CANNON</span>
+          <span class="start-footer__line"></span>
+          <span>AUTHORIZED KEEPERS ONLY</span>
+        </div>
+      </section>
+
+      <section id="hud" aria-label="游戏状态面板">
+        <div class="hud-top">
+          <div class="panel score-cluster">
+            <div class="hud-stat hud-stat--score">
+              <span class="hud-label">SCORE // 得分</span>
+              <strong id="score-value">000000</strong>
+            </div>
+            <div class="hud-divider" aria-hidden="true"></div>
+            <div class="hud-stat hud-stat--combo">
+              <span class="hud-label">COMBO</span>
+              <strong><span id="combo-value">x1</span><i>连击</i></strong>
+            </div>
+          </div>
+
+          <div class="mission-cluster">
+            <p class="eyebrow"><span class="signal-dot"></span> ACTIVE DIRECTIVE</p>
+            <p id="mission-text">准备开始饲养轮班</p>
+          </div>
+
+          <div class="panel shift-cluster">
+            <div class="hud-stat hud-stat--wave">
+              <span class="hud-label">WAVE // 波次</span>
+              <strong id="wave-value">01</strong>
+            </div>
+            <div class="hud-divider" aria-hidden="true"></div>
+            <div class="hud-stat hud-stat--time">
+              <span class="hud-label">SHIFT TIME</span>
+              <strong id="time-value">01:30</strong>
+            </div>
+            <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" title="暂停">
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="panel ammo-panel">
+            <div class="ammo-panel__label">
+              <span class="hud-label">SUPPLY // 弹药</span>
+              <strong>GEL ROUNDS</strong>
+            </div>
+            <div id="ammo-pips" aria-label="剩余弹药">
+              <span class="ammo-pip is-loaded"></span>
+              <span class="ammo-pip is-loaded"></span>
+              <span class="ammo-pip is-loaded"></span>
+              <span class="ammo-pip is-loaded"></span>
+              <span class="ammo-pip is-loaded"></span>
+              <span class="ammo-pip is-loaded"></span>
+            </div>
+          </div>
+
+          <div class="charge-module">
+            <div class="charge-labels">
+              <span>THROW POWER</span>
+              <strong>发射压力</strong>
+            </div>
+            <div class="charge-frame">
+              <div id="charge-meter" aria-label="蓄力进度">
+                <span class="charge-meter__fill"></span>
+                <span class="charge-meter__gloss"></span>
+              </div>
+            </div>
+            <span class="charge-readout">HOLD TO CHARGE</span>
+          </div>
+
+          <div class="panel specimen-panel" aria-hidden="true">
+            <span class="specimen-panel__icon">◈</span>
+            <div>
+              <span class="hud-label">ENCLOSURE</span>
+              <strong>SECTOR 07-B</strong>
+            </div>
+            <span class="specimen-panel__pulse"></span>
+          </div>
+        </div>
+      </section>
+
+      <div id="crosshair" aria-hidden="true">
+        <span class="crosshair__arc crosshair__arc--a"></span>
+        <span class="crosshair__arc crosshair__arc--b"></span>
+        <span class="crosshair__line crosshair__line--top"></span>
+        <span class="crosshair__line crosshair__line--right"></span>
+        <span class="crosshair__line crosshair__line--bottom"></span>
+        <span class="crosshair__line crosshair__line--left"></span>
+        <span class="crosshair__dot"></span>
+      </div>
+
+      <div id="hit-marker" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <section id="gameover-screen" class="screen screen--gameover" aria-labelledby="gameover-title" hidden>
+        <div class="gameover-glow" aria-hidden="true"></div>
+        <div class="panel result-card">
+          <div class="result-card__stamp" aria-hidden="true">
+            <span>SHIFT</span>
+            <strong>END</strong>
+          </div>
+          <p class="eyebrow">KEEPER REPORT // FILED</p>
+          <h2 id="gameover-title">饲养轮班完成</h2>
+          <p class="result-subtitle">THE SLIMES ARE SATISFIED. FOR NOW.</p>
+
+          <div class="score-report">
+            <div class="score-report__main">
+              <span>本次得分</span>
+              <strong id="final-score">000000</strong>
+            </div>
+            <div class="score-report__best">
+              <span>PERSONAL BEST</span>
+              <strong id="best-score">000000</strong>
+            </div>
+          </div>
+
+          <button id="restart-button" class="primary-button" type="button">
+            <span class="primary-button__icon" aria-hidden="true">↻</span>
+            <span>再值一班</span>
+            <small>RESTART SHIFT</small>
+          </button>
+        </div>
+      </section>
+
+      <button id="fire-button" type="button" aria-label="按住蓄力，松开发射">
+        <span class="fire-button__ring" aria-hidden="true"></span>
+        <span class="fire-button__core">
+          <strong>HOLD</strong>
+          <small>蓄力发射</small>
+        </span>
+      </button>
+
+      <div id="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    </main>
+
+    <noscript>
+      <div class="noscript-message">请启用 JavaScript 以运行《黏液动物园：补给炮台》。</div>
+    </noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
