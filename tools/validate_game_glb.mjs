@@ -70,6 +70,17 @@ function finiteTransform(node, name) {
   }
 }
 
+function nearlyEqual(actual, expected, epsilon = 0.002) {
+  return Math.abs(actual - expected) <= epsilon;
+}
+
+function requireTranslation(node, name, expected) {
+  const translation = node.translation ?? [0, 0, 0];
+  if (translation.length !== 3 || !translation.every((value, index) => nearlyEqual(value, expected[index]))) {
+    fail(`${name} translation must remain ${JSON.stringify(expected)}; found ${JSON.stringify(translation)}`);
+  }
+}
+
 function inspectDocument(document) {
   const nodes = document.nodes ?? [];
   const nodeIndices = new Map();
@@ -108,10 +119,37 @@ function inspectDocument(document) {
 
   const root = nodes[nodeIndices.get('CannonAssetRoot')[0]];
   if (root.extras?.asset_id !== 'slop-zoo-cannon') fail('root asset_id is missing');
-  if (!Number.isInteger(root.extras?.asset_version) || root.extras.asset_version < 2) {
-    fail('root asset_version must be at least 2');
+  if (!Number.isInteger(root.extras?.asset_version) || root.extras.asset_version < 3) {
+    fail('root asset_version must be at least 3');
   }
   if (root.extras?.license !== 'MIT') fail('root license must be MIT');
+
+  const pitch = nodes[nodeIndices.get('CannonPitch')[0]];
+  const muzzle = nodes[nodeIndices.get('MuzzleAnchor')[0]];
+  const gauge = nodes[nodeIndices.get('CannonGaugeNeedle')[0]];
+  requireTranslation(pitch, 'CannonPitch', [0, 1.55, 0]);
+  requireTranslation(muzzle, 'MuzzleAnchor', [3.48, 0.29, 0]);
+  const gaugeRotation = gauge.rotation ?? [0, 0, 0, 1];
+  if (
+    gaugeRotation.length !== 4
+    || Math.abs(gaugeRotation[0]) > 0.002
+    || Math.abs(gaugeRotation[1]) > 0.002
+    || Math.abs(gaugeRotation[2]) < 0.1
+  ) {
+    fail(`CannonGaugeNeedle must rotate around exported local Z; found ${JSON.stringify(gaugeRotation)}`);
+  }
+
+  for (const name of [
+    'CannonChargeGlow',
+    'CannonAmmoGlow',
+    'CannonGaugeNeedle',
+    'CannonStatusLight',
+    'CannonMuzzleGlow',
+  ]) {
+    const node = nodes[nodeIndices.get(name)[0]];
+    const hasDirectMeshChild = (node.children ?? []).some((childIndex) => nodes[childIndex]?.mesh !== undefined);
+    if (!hasDirectMeshChild) fail(`${name} must keep a direct render-mesh child`);
+  }
 
   const meshes = document.meshes ?? [];
   const materials = document.materials ?? [];

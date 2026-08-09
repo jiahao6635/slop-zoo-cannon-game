@@ -16,6 +16,11 @@ REQUIRED_NODE_CONTRACT = {
     "CannonPitch": ("CannonYaw", "pitch"),
     "CannonRecoil": ("CannonPitch", "recoil"),
     "MuzzleAnchor": ("CannonRecoil", "projectile_origin"),
+    "CannonChargeGlow": ("CannonRecoil", "charge_glow"),
+    "CannonAmmoGlow": ("CannonRecoil", "ammo_reservoir"),
+    "CannonGaugeNeedle": ("CannonRecoil", "charge_gauge"),
+    "CannonStatusLight": ("CannonRecoil", "status_light"),
+    "CannonMuzzleGlow": ("CannonRecoil", "muzzle_glow"),
 }
 MERGE_GROUPS = {
     "CannonAssetRoot": "CannonRootRender",

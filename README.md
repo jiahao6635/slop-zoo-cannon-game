@@ -119,7 +119,7 @@ BLENDER_BIN=/path/to/blender npm run export:assets
 
 导出会更新 `public/assets/slop-cannon.glb`，即 Three.js 加载的发布资产。
 
-Blender 源文件保留可编辑的炮台主体，并加入黏液弹药罐、充能线圈、炮口发光环、压力表指针、状态灯和橙色安全底环。发布导出保留以下运行时控制节点：
+Blender 源文件包含可复现生成的 V3 炮台：游戏级低面拓扑、黏液弹药罐保护框、输送管、充能线圈、顶部瞄准导轨、四向炮口护片、压力表刻度与指针、状态灯、检修面板和基座固定夹。发布导出保留以下运行时控制节点：
 
 - `CannonAssetRoot`：炮台资产根节点。
 - `CannonYaw`：水平瞄准。
@@ -132,7 +132,7 @@ Blender 源文件保留可编辑的炮台主体，并加入黏液弹药罐、充
 - `CannonStatusLight`：指示任务稳定度的状态灯。
 - `CannonMuzzleGlow`：响应蓄力、开火与后坐的炮口光效。
 
-当前 GLB 经合批、去重与 Meshopt 压缩后为 18 个节点、8 个网格、11 个图元、27,336 个三角面、4 个 PBR 材质和 138,576 字节，不包含纹理、动画、相机或灯光。导出阶段会拒绝退化面；`public/assets/slop-cannon.asset.json` 记录许可证、工具链、SHA-256 与预算统计，`npm run check:assets` 会验证节点契约与发布预算。实时黏液弹与飞溅由 Three.js 生成。
+当前 GLB 经合批、去重与 Meshopt 压缩后为 18 个节点、8 个网格、12 个图元、13,096 个三角面、4 个 PBR 材质和 94,560 字节。相较 V2，三角面减少约 52%，文件减少约 32%，同时保持无纹理、无动画、无相机和无灯光。导出阶段会拒绝退化面，并验证炮口/俯仰枢轴、五类反馈节点及压力表旋转轴；`public/assets/slop-cannon.asset.json` 记录许可证、工具链、SHA-256 与预算统计。实时黏液弹与飞溅由 Three.js 生成。
 
 ## 目录
 

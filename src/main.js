@@ -1174,7 +1174,7 @@ function loadCannonAsset() {
           modelMuzzle = rig.muzzle;
           modelRecoilBase.copy(modelRecoil.position);
           modelGaugeNeedle = rig.gaugeNeedle;
-          modelGaugeNeedleBase = modelGaugeNeedle?.rotation.y ?? 0;
+          modelGaugeNeedleBase = modelGaugeNeedle?.rotation.z ?? 0;
           modelChargeMeshes = collectNodeMeshes(rig.chargeGlow);
           modelAmmoMeshes = collectNodeMeshes(rig.ammoGlow);
           modelStatusMeshes = collectNodeMeshes(rig.statusLight);
@@ -1664,8 +1664,8 @@ function updateCannonModelFeedback() {
   setCannonGlow(modelStatusMeshes, 1.5 + pulse * 4, statusColor);
 
   if (modelGaugeNeedle) {
-    const target = modelGaugeNeedleBase + THREE.MathUtils.lerp(-0.15, 1.25, charge);
-    modelGaugeNeedle.rotation.y = THREE.MathUtils.lerp(modelGaugeNeedle.rotation.y, target, 0.22);
+    const target = modelGaugeNeedleBase + THREE.MathUtils.lerp(0, -1.3, charge);
+    modelGaugeNeedle.rotation.z = THREE.MathUtils.lerp(modelGaugeNeedle.rotation.z, target, 0.22);
   }
 }
 
