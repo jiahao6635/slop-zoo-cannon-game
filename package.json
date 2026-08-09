@@ -27,7 +27,9 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "test": "node --test",
     "build": "vite build",
+    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "sanitize:assets": "node tools/sanitize_assets.mjs",
     "export:assets": "node tools/export_assets.mjs"

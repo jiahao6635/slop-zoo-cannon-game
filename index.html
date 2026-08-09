@@ -43,64 +43,342 @@
       </section>
 
       <section id="start-screen" class="screen screen--start" aria-labelledby="game-title">
-        <div class="start-layout">
+        <div id="main-menu-screen" class="start-layout">
           <div class="title-block">
-            <p class="eyebrow"><span class="signal-dot"></span> SECTOR 07 // FEEDING EMERGENCY</p>
+            <p class="eyebrow"><span class="signal-dot"></span> ZOO RECOVERY // AREA 01 ONLINE</p>
             <h1 id="game-title">
               <span>黏液动物园</span>
               <strong>补给炮台</strong>
             </h1>
-            <p class="game-tagline">瞄准。蓄力。把果冻补给送到每一张嗷嗷待哺的嘴里。</p>
+            <p class="game-tagline">瞄准、蓄力、选择合适补给，夺回被维护 AI 封锁的动物园。</p>
 
-            <button id="start-button" class="primary-button" type="button">
-              <span class="primary-button__icon" aria-hidden="true">▶</span>
-              <span>启动炮台</span>
-              <small>START SHIFT</small>
-            </button>
+            <nav class="main-menu" aria-label="主菜单">
+              <button id="main-continue-button" class="primary-button" type="button">
+                <span class="primary-button__icon" aria-hidden="true">▶</span>
+                <span>继续战役</span>
+                <small>MISSION 02 // 12%</small>
+              </button>
+              <button id="main-missions-button" class="menu-button" type="button">
+                <span aria-hidden="true">◆</span>
+                <strong>任务选择</strong>
+                <small>AREA MAP</small>
+              </button>
+              <button id="main-settings-button" class="menu-button" type="button">
+                <span aria-hidden="true">⚙</span>
+                <strong>设置</strong>
+                <small>OPTIONS</small>
+              </button>
+              <button id="start-button" class="menu-button menu-button--accent" type="button">
+                <span aria-hidden="true">◉</span>
+                <strong>经典轮班</strong>
+                <small>QUICK SHIFT</small>
+              </button>
+            </nav>
           </div>
 
-          <aside class="panel briefing-card" aria-label="任务简报">
+          <aside class="panel briefing-card" aria-label="当前任务简报">
             <div class="panel__header">
-              <span class="panel__index">01</span>
+              <span class="panel__index">02</span>
               <div>
-                <p class="eyebrow">KEEPERS' BRIEF</p>
-                <h2>今日饲养简报</h2>
+                <p class="eyebrow">NEXT DIRECTIVE</p>
+              <h2>传送带早餐</h2>
               </div>
-              <span class="status-chip">LIVE</span>
+              <span class="status-chip">READY</span>
             </div>
             <p class="briefing-copy">
-              黏液小兽们正涌向饲养环廊。发射营养果冻弹，连续命中可启动连击加成。
+              熊猫与跃跃兔已抵达翠竹育幼园。利用黏附预埋应对拥挤目标，在三分钟内完成 16 份补给。
             </p>
-            <ul class="controls-list">
-              <li>
-                <span class="keycap keycap--wide">移动</span>
-                <span>鼠标 / 触摸</span>
-                <small>瞄准</small>
-              </li>
-              <li>
-                <span class="keycap keycap--wide">按住</span>
-                <span>鼠标左键</span>
-                <small>蓄力</small>
-              </li>
-              <li>
-                <span class="keycap keycap--wide">松开</span>
-                <span>鼠标左键</span>
-                <small>发射</small>
-              </li>
-              <li>
-                <span class="keycap">P</span>
-                <span>暂停轮班</span>
-                <small>PAUSE</small>
-              </li>
+            <div class="brief-progress" aria-label="区域恢复进度">
+              <span><strong>区域恢复</strong><b>12%</b></span>
+              <i><span style="width: 12%"></span></i>
+            </div>
+            <dl class="brief-meta">
+              <div><dt>最佳评价</dt><dd>A</dd></div>
+              <div><dt>照护徽章</dt><dd>● ○ ○</dd></div>
+              <div><dt>预计时长</dt><dd>05:00</dd></div>
+            </dl>
+            <ul class="controls-list controls-list--compact">
+              <li><span class="keycap">1–3</span><span>切换弹种</span><small>AMMO</small></li>
+              <li><span class="keycap">P</span><span>暂停任务</span><small>PAUSE</small></li>
             </ul>
           </aside>
         </div>
 
         <div class="start-footer" aria-hidden="true">
-          <span>MK-IV GOO CANNON</span>
+          <span>BUILD VS-01</span>
           <span class="start-footer__line"></span>
-          <span>AUTHORIZED KEEPERS ONLY</span>
+          <span>LOCAL SAVE // ONLINE</span>
         </div>
+      </section>
+
+      <section id="mission-select-screen" class="screen screen--menu" aria-labelledby="mission-select-title" hidden>
+        <div class="menu-shell menu-shell--wide">
+          <header class="menu-header">
+            <div>
+              <p class="eyebrow">AREA 01 // BAMBOO NURSERY</p>
+              <h2 id="mission-select-title">翠竹育幼园</h2>
+              <p>完成五次饲养任务，恢复区域自动补给网络。</p>
+            </div>
+            <div class="area-progress" aria-label="区域进度 20%">
+              <strong>20%</strong>
+              <span>恢复度</span>
+            </div>
+          </header>
+
+          <div id="mission-list" class="mission-list" aria-label="任务列表">
+            <button id="mission-card-1" class="mission-card is-complete" type="button" data-mission="sector-07-01" aria-pressed="false">
+              <span class="mission-card__number">01</span>
+              <span class="mission-card__body">
+                <small>TUTORIAL // COMPLETE</small>
+                <strong>炮台资格考核</strong>
+                <span>学习瞄准、蓄力与靶心命中</span>
+              </span>
+              <span class="mission-card__badges" aria-label="获得三枚徽章">● ● ●</span>
+              <span class="mission-card__grade">S</span>
+            </button>
+            <button id="mission-card-2" class="mission-card is-selected" type="button" data-mission="sector-07-02" aria-pressed="true">
+              <span class="mission-card__number">02</span>
+              <span class="mission-card__body">
+                <small>QUOTA // CURRENT</small>
+                <strong>传送带早餐</strong>
+                <span>完成 16 份补给并学会黏附预埋</span>
+              </span>
+              <span class="mission-card__badges" aria-label="获得一枚徽章">● ○ ○</span>
+              <span class="mission-card__grade">A</span>
+            </button>
+            <button id="mission-card-3" class="mission-card" type="button" data-mission="sector-07-03" aria-pressed="false">
+              <span class="mission-card__number">03</span>
+              <span class="mission-card__body">
+                <small>HAZARD // AVAILABLE</small>
+                <strong>红色警戒线</strong>
+                <span>避开清洁机，阻止偷食无人机</span>
+              </span>
+              <span class="mission-card__badges" aria-label="尚未获得徽章">○ ○ ○</span>
+              <span class="mission-card__grade">—</span>
+            </button>
+            <button id="mission-card-4" class="mission-card" type="button" data-mission="sector-07-04" aria-pressed="false">
+              <span class="mission-card__number">04</span>
+              <span class="mission-card__body">
+                <small>PRECISION // AVAILABLE</small>
+                <strong>零浪费调度</strong>
+                <span>库存有限，准确完成顺序订单</span>
+              </span>
+              <span class="mission-card__badges" aria-label="尚未获得徽章">○ ○ ○</span>
+              <span class="mission-card__grade">—</span>
+            </button>
+            <button id="mission-card-5" class="mission-card mission-card--boss" type="button" data-mission="sector-07-05" aria-pressed="false">
+              <span class="mission-card__number">05</span>
+              <span class="mission-card__body">
+                <small>BOSS // AREA FINALE</small>
+                <strong>自动分拣转盘</strong>
+                <span>三阶段修复区域补给中枢</span>
+              </span>
+              <span class="mission-card__badges" aria-label="尚未获得徽章">○ ○ ○</span>
+              <span class="mission-card__grade">—</span>
+            </button>
+          </div>
+
+          <aside id="mission-detail" class="panel mission-detail" aria-label="所选任务详情">
+            <div class="mission-detail__visual" aria-hidden="true"><span>02</span><strong>QUOTA</strong></div>
+            <div>
+              <p class="eyebrow">SELECTED MISSION</p>
+              <h3 id="selected-mission-name">传送带早餐</h3>
+              <p id="selected-mission-description">在三分钟内完成 16 份补给。动物请求超时会降低园区稳定度。</p>
+            </div>
+            <dl>
+              <div><dt>主目标</dt><dd id="selected-mission-objective">补给 16 / 16</dd></div>
+              <div><dt>技术目标</dt><dd>达成 6 连击</dd></div>
+              <div><dt>特殊目标</dt><dd>两次黏附多目标补给</dd></div>
+            </dl>
+          </aside>
+
+          <footer class="menu-actions">
+            <button id="mission-back-button" class="secondary-button" type="button">← 返回主菜单</button>
+            <button id="mission-loadout-button" class="primary-button primary-button--compact" type="button">
+              <span class="primary-button__icon" aria-hidden="true">◆</span><span>配置装备</span><small>LOADOUT</small>
+            </button>
+          </footer>
+        </div>
+      </section>
+
+      <section id="loadout-screen" class="screen screen--menu" aria-labelledby="loadout-title" hidden>
+        <div class="menu-shell menu-shell--wide loadout-shell">
+          <header class="menu-header">
+            <div>
+              <p class="eyebrow">MISSION 02 // PREPARE LOADOUT</p>
+              <h2 id="loadout-title">饲养员装配</h2>
+              <p>选择三种弹药与一个炮台模块。数字键 1–3 可在任务中切换弹种。</p>
+            </div>
+            <span class="status-chip">AUTO-SAVED</span>
+          </header>
+
+          <div class="loadout-grid">
+            <section class="loadout-section" aria-labelledby="ammo-loadout-title">
+              <div class="section-heading">
+                <div><span>01</span><h3 id="ammo-loadout-title">弹药槽位</h3></div>
+                <small>3 / 3 EQUIPPED</small>
+              </div>
+              <div class="ammo-slots" aria-label="已装备弹药">
+                <button id="ammo-slot-1" class="ammo-slot is-active" type="button" data-slot="1" aria-pressed="true">
+                  <kbd>1</kbd><span class="ammo-orb ammo-orb--nutrition" aria-hidden="true"></span><strong>营养凝胶弹</strong><small>无限补给</small>
+                </button>
+                <button id="ammo-slot-2" class="ammo-slot" type="button" data-slot="2" aria-pressed="false">
+                  <kbd>2</kbd><span class="ammo-orb ammo-orb--bloom" aria-hidden="true"></span><strong>黏附花苞弹</strong><small>库存 ×3</small>
+                </button>
+                <button id="ammo-slot-3" class="ammo-slot" type="button" data-slot="3" aria-pressed="false">
+                  <kbd>3</kbd><span class="ammo-orb ammo-orb--bounce" aria-hidden="true"></span><strong>弹力泡胶</strong><small>库存 ×4</small>
+                </button>
+              </div>
+
+              <div class="ammo-options" aria-label="可用弹药">
+                <button id="ammo-option-nutrition" class="equipment-card is-equipped" type="button" data-ammo="nutrient-gel" aria-pressed="true">
+                  <span class="ammo-orb ammo-orb--nutrition" aria-hidden="true"></span>
+                  <span><small>STANDARD // REGENERATES</small><strong>营养凝胶弹</strong><em>精准单体补给。靶心命中加快装填。</em></span>
+                  <b>已装备</b>
+                </button>
+                <button id="ammo-option-bloom" class="equipment-card is-equipped" type="button" data-ammo="adhesive-bloom" aria-pressed="true">
+                  <span class="ammo-orb ammo-orb--bloom" aria-hidden="true"></span>
+                  <span><small>STICKY // LIMITED</small><strong>黏附花苞弹</strong><em>粘附并范围补给。飞行中再次发射可引爆。</em></span>
+                  <b>已装备</b>
+                </button>
+                <button id="ammo-option-bounce" class="equipment-card is-equipped" type="button" data-ammo="bounce-bubble" aria-pressed="true">
+                  <span class="ammo-orb ammo-orb--bounce" aria-hidden="true"></span>
+                  <span><small>RICOCHET // LIMITED</small><strong>弹力泡胶</strong><em>可在地面与反弹板弹跳。二段可提前爆开。</em></span>
+                  <b>已装备</b>
+                </button>
+              </div>
+            </section>
+
+            <section class="loadout-section module-section" aria-labelledby="module-loadout-title">
+              <div class="section-heading">
+                <div><span>02</span><h3 id="module-loadout-title">炮台模块</h3></div>
+                <small>1 / 1 EQUIPPED</small>
+              </div>
+              <button id="module-option-stabilizer" class="module-card is-equipped" type="button" data-module="pressure-stabilizer" aria-pressed="true">
+                <span class="module-card__icon" aria-hidden="true">⌖</span>
+                <span><small>BARREL MODULE</small><strong>MK-II 稳压器</strong><em>蓄力变化速度降低 18%，完美蓄力窗口扩大。</em></span>
+                <b>EQUIPPED</b>
+              </button>
+              <div class="module-locked" aria-label="另外两个模块槽尚未解锁">
+                <span>🔒</span><div><strong>组合电容</strong><small>获得 6 枚照护徽章后解锁</small></div>
+              </div>
+              <div class="loadout-tip">
+                <span aria-hidden="true">i</span>
+                <p><strong>二段能力</strong> 花苞弹与泡胶飞行时，再按一次发射键触发特殊效果。</p>
+              </div>
+            </section>
+          </div>
+
+          <footer class="menu-actions">
+            <button id="loadout-back-button" class="secondary-button" type="button">← 返回任务</button>
+            <button id="launch-mission-button" class="primary-button primary-button--compact" type="button">
+              <span class="primary-button__icon" aria-hidden="true">▶</span><span>开始任务</span><small>DEPLOY</small>
+            </button>
+          </footer>
+        </div>
+      </section>
+
+      <section id="settings-screen" class="screen screen--menu" aria-labelledby="settings-title" hidden>
+        <form id="settings-form" class="menu-shell settings-shell">
+          <header class="menu-header">
+            <div>
+              <p class="eyebrow">SYSTEM // PLAYER PREFERENCES</p>
+              <h2 id="settings-title">设置</h2>
+              <p>设置会自动保存在本机，可随时恢复默认值。</p>
+            </div>
+            <span class="status-chip">LOCAL PROFILE</span>
+          </header>
+
+          <div class="settings-grid">
+            <fieldset class="settings-group">
+              <legend><span>01</span> 显示与界面</legend>
+              <label class="setting-row setting-row--select" for="setting-render-scale">
+                <span><strong>渲染精度</strong><small>降低可提升低配设备帧率</small></span>
+                <select id="setting-render-scale" name="renderScale">
+                  <option value="0.75">75%</option>
+                  <option value="1" selected>100%</option>
+                  <option value="1.25">125%</option>
+                </select>
+              </label>
+              <label class="setting-row" for="setting-ui-scale">
+                <span><strong>界面缩放</strong><small>HUD 与菜单文字尺寸</small></span>
+                <span class="range-control"><input id="setting-ui-scale" name="uiScale" type="range" min="80" max="150" value="100" step="5" /><output>100%</output></span>
+              </label>
+              <label class="setting-row setting-row--toggle" for="setting-high-contrast">
+                <span><strong>高对比界面</strong><small>强化轮廓、提示与危险形状</small></span>
+                <span class="toggle"><input id="setting-high-contrast" name="highContrast" type="checkbox" /><i aria-hidden="true"></i></span>
+              </label>
+              <label class="setting-row setting-row--toggle" for="setting-reduced-motion">
+                <span><strong>减少动态效果</strong><small>弱化界面动画、闪烁与移动背景</small></span>
+                <span class="toggle"><input id="setting-reduced-motion" name="reducedMotion" type="checkbox" /><i aria-hidden="true"></i></span>
+              </label>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend><span>02</span> 玩法与镜头</legend>
+              <label class="setting-row setting-row--select" for="setting-trajectory">
+                <span><strong>弹道预测线</strong><small>专家模式可缩短或关闭</small></span>
+                <select id="setting-trajectory" name="trajectory">
+                  <option value="full" selected>完整</option>
+                  <option value="short">短线</option>
+                  <option value="off">关闭</option>
+                </select>
+              </label>
+              <label class="setting-row" for="setting-aim-assist">
+                <span><strong>瞄准辅助</strong><small>靠近目标时的轻微吸附</small></span>
+                <span class="range-control"><input id="setting-aim-assist" name="aimAssist" type="range" min="0" max="100" value="35" step="5" /><output>35%</output></span>
+              </label>
+              <label class="setting-row" for="setting-camera-shake">
+                <span><strong>镜头震动</strong><small>发射、命中与 Boss 冲击强度</small></span>
+                <span class="range-control"><input id="setting-camera-shake" name="cameraShake" type="range" min="0" max="100" value="60" step="5" /><output>60%</output></span>
+              </label>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend><span>03</span> 音频</legend>
+              <label class="setting-row" for="setting-master-volume">
+                <span><strong>总音量</strong><small>所有声音的整体音量</small></span>
+                <span class="range-control"><input id="setting-master-volume" name="masterVolume" type="range" min="0" max="100" value="80" step="5" /><output>80%</output></span>
+              </label>
+              <label class="setting-row" for="setting-music-volume">
+                <span><strong>音乐</strong><small>区域与 Boss 音乐</small></span>
+                <span class="range-control"><input id="setting-music-volume" name="musicVolume" type="range" min="0" max="100" value="65" step="5" /><output>65%</output></span>
+              </label>
+              <label class="setting-row" for="setting-sfx-volume">
+                <span><strong>音效</strong><small>炮台、动物与环境反馈</small></span>
+                <span class="range-control"><input id="setting-sfx-volume" name="sfxVolume" type="range" min="0" max="100" value="85" step="5" /><output>85%</output></span>
+              </label>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend><span>04</span> 手柄</legend>
+              <label class="setting-row" for="setting-gamepad-sensitivity">
+                <span><strong>瞄准灵敏度</strong><small>右摇杆视角移动速度</small></span>
+                <span class="range-control"><input id="setting-gamepad-sensitivity" name="gamepadSensitivity" type="range" min="20" max="200" value="100" step="5" /><output>100%</output></span>
+              </label>
+              <label class="setting-row" for="setting-gamepad-deadzone">
+                <span><strong>摇杆死区</strong><small>抑制摇杆静止漂移</small></span>
+                <span class="range-control"><input id="setting-gamepad-deadzone" name="gamepadDeadzone" type="range" min="0" max="40" value="12" step="1" /><output>12%</output></span>
+              </label>
+              <label class="setting-row setting-row--toggle" for="setting-invert-y">
+                <span><strong>反转 Y 轴</strong><small>上下瞄准方向反转</small></span>
+                <span class="toggle"><input id="setting-invert-y" name="invertY" type="checkbox" /><i aria-hidden="true"></i></span>
+              </label>
+              <label class="setting-row" for="setting-vibration">
+                <span><strong>震动强度</strong><small>支持的手柄将应用此设置</small></span>
+                <span class="range-control"><input id="setting-vibration" name="vibration" type="range" min="0" max="100" value="70" step="5" /><output>70%</output></span>
+              </label>
+            </fieldset>
+          </div>
+
+          <footer class="menu-actions settings-actions">
+            <button id="settings-back-button" class="secondary-button" type="button">← 取消</button>
+            <button id="settings-default-button" class="text-button" type="reset">恢复默认</button>
+            <button id="settings-apply-button" class="primary-button primary-button--compact" type="submit">
+              <span class="primary-button__icon" aria-hidden="true">✓</span><span>应用设置</span><small>SAVE</small>
+            </button>
+          </footer>
+        </form>
       </section>
 
       <section id="hud" aria-label="游戏状态面板">
@@ -120,9 +398,23 @@
           <div class="mission-cluster">
             <p class="eyebrow"><span class="signal-dot"></span> ACTIVE DIRECTIVE</p>
             <p id="mission-text">准备开始饲养轮班</p>
+            <div class="mission-progress">
+              <span><small>MISSION PROGRESS</small><strong id="mission-progress-value">0 / 16</strong></span>
+              <div id="mission-progress-meter" role="progressbar" aria-label="任务进度" aria-valuemin="0" aria-valuemax="16" aria-valuenow="0">
+                <span></span>
+              </div>
+            </div>
           </div>
 
           <div class="panel shift-cluster">
+            <div class="hud-stat hud-stat--stability">
+              <span class="hud-label">ZOO STABILITY</span>
+              <strong id="stability-value">100%</strong>
+              <div id="stability-meter" role="progressbar" aria-label="园区稳定度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                <span></span>
+              </div>
+            </div>
+            <div class="hud-divider" aria-hidden="true"></div>
             <div class="hud-stat hud-stat--wave">
               <span class="hud-label">WAVE // 波次</span>
               <strong id="wave-value">01</strong>
@@ -141,9 +433,9 @@
 
         <div class="hud-bottom">
           <div class="panel ammo-panel">
-            <div class="ammo-panel__label">
+            <div class="ammo-panel__label current-ammo">
               <span class="hud-label">SUPPLY // 弹药</span>
-              <strong>GEL ROUNDS</strong>
+              <span><i id="current-ammo-icon" class="ammo-orb ammo-orb--nutrition" aria-hidden="true"></i><strong id="current-ammo-name">营养凝胶弹</strong></span>
             </div>
             <div id="ammo-pips" aria-label="剩余弹药">
               <span class="ammo-pip is-loaded"></span>
@@ -152,6 +444,10 @@
               <span class="ammo-pip is-loaded"></span>
               <span class="ammo-pip is-loaded"></span>
               <span class="ammo-pip is-loaded"></span>
+            </div>
+            <div class="special-inventory" aria-label="特殊弹库存">
+              <span title="黏附花苞弹"><i class="ammo-orb ammo-orb--bloom" aria-hidden="true"></i><b id="special-ammo-bloom">2</b></span>
+              <span title="弹力泡胶"><i class="ammo-orb ammo-orb--bounce" aria-hidden="true"></i><b id="special-ammo-bounce">3</b></span>
             </div>
           </div>
 
@@ -167,6 +463,7 @@
               </div>
             </div>
             <span class="charge-readout">HOLD TO CHARGE</span>
+            <span id="secondary-action-hint" class="secondary-action-hint" hidden><kbd>再按一次</kbd> 手动引爆花苞弹</span>
           </div>
 
           <div class="panel specimen-panel" aria-hidden="true">
@@ -194,33 +491,94 @@
         <span></span><span></span><span></span><span></span>
       </div>
 
-      <section id="gameover-screen" class="screen screen--gameover" aria-labelledby="gameover-title" hidden>
+      <section id="pause-screen" class="screen screen--overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+        <div class="panel pause-card">
+          <header>
+            <p class="eyebrow"><span class="signal-dot"></span> SHIFT SUSPENDED</p>
+            <h2 id="pause-title">任务已暂停</h2>
+            <p>炮台已进入安全锁定，计时与目标请求均已停止。</p>
+          </header>
+          <div class="pause-summary">
+            <div><span>当前任务</span><strong id="pause-mission-name">传送带早餐</strong></div>
+            <div><span>任务进度</span><strong id="pause-mission-progress">7 / 16</strong></div>
+            <div><span>稳定度</span><strong id="pause-stability-value">82%</strong></div>
+          </div>
+          <nav class="pause-menu" aria-label="暂停菜单">
+            <button id="resume-button" class="primary-button" type="button">
+              <span class="primary-button__icon" aria-hidden="true">▶</span><span>继续任务</span><small>RESUME</small>
+            </button>
+            <button id="retry-button" class="menu-button" type="button"><span aria-hidden="true">↻</span><strong>重新开始</strong><small>RETRY</small></button>
+            <button id="pause-settings-button" class="menu-button" type="button"><span aria-hidden="true">⚙</span><strong>设置</strong><small>OPTIONS</small></button>
+            <button id="quit-mission-button" class="menu-button menu-button--danger" type="button"><span aria-hidden="true">×</span><strong>退出任务</strong><small>RETURN TO MAP</small></button>
+          </nav>
+          <p class="pause-shortcut"><kbd>Esc</kbd> 或 <kbd>P</kbd> 继续</p>
+        </div>
+      </section>
+
+      <section id="gameover-screen" class="screen screen--gameover" role="dialog" aria-modal="true" aria-labelledby="gameover-title" hidden>
         <div class="gameover-glow" aria-hidden="true"></div>
         <div class="panel result-card">
           <div class="result-card__stamp" aria-hidden="true">
-            <span>SHIFT</span>
-            <strong>END</strong>
+            <span id="result-status">MISSION</span>
+            <strong>PASS</strong>
           </div>
-          <p class="eyebrow">KEEPER REPORT // FILED</p>
-          <h2 id="gameover-title">饲养轮班完成</h2>
-          <p class="result-subtitle">THE SLIMES ARE SATISFIED. FOR NOW.</p>
+          <header class="result-header">
+            <div>
+              <p class="eyebrow">KEEPER REPORT // FILED</p>
+              <h2 id="gameover-title">任务完成</h2>
+              <p class="result-subtitle">BAMBOO NURSERY // MISSION 02</p>
+            </div>
+            <div class="result-grade" aria-label="任务评价">
+              <span>RATING</span><strong id="result-grade">A</strong><small>优秀照护</small>
+            </div>
+          </header>
 
-          <div class="score-report">
-            <div class="score-report__main">
-              <span>本次得分</span>
-              <strong id="final-score">000000</strong>
+          <div class="result-layout">
+            <div>
+              <div class="score-report">
+                <div class="score-report__main">
+                  <span>本次得分</span>
+                  <strong id="final-score">000000</strong>
+                </div>
+                <div class="score-report__best">
+                  <span>PERSONAL BEST</span>
+                  <strong id="best-score">000000</strong>
+                </div>
+              </div>
+
+              <section class="badge-report" aria-labelledby="badge-report-title">
+                <h3 id="badge-report-title">照护徽章 <span>2 / 3</span></h3>
+                <div>
+                  <article id="result-badge-1" class="badge-item is-earned"><span aria-hidden="true">✓</span><div><strong>完成任务</strong><small>完成 16 份补给</small></div></article>
+                  <article id="result-badge-2" class="badge-item is-earned"><span aria-hidden="true">✓</span><div><strong>连续配送</strong><small>达成 6 连击</small></div></article>
+                  <article id="result-badge-3" class="badge-item"><span aria-hidden="true">◆</span><div><strong>花苞盛放</strong><small>两次黏附引爆各补给 2 只动物</small></div></article>
+                </div>
+              </section>
             </div>
-            <div class="score-report__best">
-              <span>PERSONAL BEST</span>
-              <strong id="best-score">000000</strong>
-            </div>
+
+            <section class="stat-report" aria-labelledby="stat-report-title">
+              <h3 id="stat-report-title">任务统计</h3>
+              <dl>
+                <div><dt>命中率</dt><dd id="result-accuracy">82%</dd></div>
+                <div><dt>靶心率</dt><dd id="result-bullseye">36%</dd></div>
+                <div><dt>最长连击</dt><dd id="result-longest-combo">×8</dd></div>
+                <div><dt>特殊弹使用</dt><dd id="result-special-used">4</dd></div>
+                <div><dt>剩余稳定度</dt><dd id="result-stability">68%</dd></div>
+                <div><dt>完成时间</dt><dd id="result-time">02:47</dd></div>
+              </dl>
+              <div id="result-unlock" class="unlock-report">
+                <span aria-hidden="true">✦</span><div><small>NEW UNLOCK</small><strong>任务 03：红色警戒线</strong></div>
+              </div>
+            </section>
           </div>
 
-          <button id="restart-button" class="primary-button" type="button">
-            <span class="primary-button__icon" aria-hidden="true">↻</span>
-            <span>再值一班</span>
-            <small>RESTART SHIFT</small>
-          </button>
+          <footer class="result-actions">
+            <button id="result-mission-button" class="secondary-button" type="button">任务选择</button>
+            <button id="restart-button" class="secondary-button" type="button">↻ 立即重试</button>
+            <button id="result-next-button" class="primary-button primary-button--compact" type="button">
+              <span class="primary-button__icon" aria-hidden="true">▶</span><span>下一任务</span><small>CONTINUE</small>
+            </button>
+          </footer>
         </div>
       </section>
 
