@@ -56,6 +56,53 @@ def add_area_light(
     point_at(obj, target)
 
 
+def strip_jpeg_comments(path: Path) -> int:
+    """Remove Blender's JPEG COM blocks without recompressing image pixels."""
+    data = path.read_bytes()
+    if not data.startswith(b"\xff\xd8"):
+        raise ValueError(f"Not a JPEG file: {path}")
+
+    cleaned = bytearray(data[:2])
+    offset = 2
+    removed = 0
+
+    while offset < len(data):
+        marker_start = offset
+        if data[offset] != 0xFF:
+            raise ValueError(f"Invalid JPEG marker at byte {offset}: {path}")
+
+        while offset < len(data) and data[offset] == 0xFF:
+            offset += 1
+        if offset >= len(data):
+            raise ValueError(f"Truncated JPEG marker: {path}")
+
+        marker = data[offset]
+        offset += 1
+        if marker == 0xDA:  # Start of Scan; the remaining bytes are entropy-coded data.
+            cleaned.extend(data[marker_start:])
+            break
+        if marker in {0xD8, 0xD9, 0x01} or 0xD0 <= marker <= 0xD7:
+            cleaned.extend(data[marker_start:offset])
+            continue
+        if offset + 2 > len(data):
+            raise ValueError(f"Truncated JPEG segment length: {path}")
+
+        segment_length = int.from_bytes(data[offset : offset + 2], "big")
+        if segment_length < 2 or offset + segment_length > len(data):
+            raise ValueError(f"Invalid JPEG segment length: {path}")
+        segment_end = offset + segment_length
+
+        if marker == 0xFE:  # COM metadata written by Blender includes the source path.
+            removed += 1
+        else:
+            cleaned.extend(data[marker_start:segment_end])
+        offset = segment_end
+
+    if removed:
+        path.write_bytes(cleaned)
+    return removed
+
+
 def main() -> None:
     args = parse_args()
     output = Path(args.output).resolve()
@@ -127,7 +174,8 @@ def main() -> None:
     )
 
     bpy.ops.render.render(write_still=True)
-    print(f"PREVIEW_OK output={output}")
+    removed_comments = strip_jpeg_comments(output) if output.suffix.lower() in {".jpg", ".jpeg"} else 0
+    print(f"PREVIEW_OK output={output} removed_comments={removed_comments}")
 
 
 if __name__ == "__main__":
