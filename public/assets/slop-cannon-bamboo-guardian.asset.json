@@ -1,0 +1,25 @@
+{
+  "assetId": "slop-zoo-cannon-bamboo-guardian",
+  "skinId": "bamboo-guardian",
+  "assetVersion": 3,
+  "license": "MIT",
+  "nodeCount": 18,
+  "meshCount": 8,
+  "primitiveCount": 14,
+  "materialCount": 4,
+  "triangleCount": 16064,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_materials_clearcoat",
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization"
+  ],
+  "source": "blender/slop_zoo_game_assets_bamboo_guardian.blend",
+  "output": "public/assets/slop-cannon-bamboo-guardian.glb",
+  "bytes": 115336,
+  "sha256": "5b4d308aa1b6f8079fd28497ad524181b7ca3e6bd1fbd08a3c88270e66870299",
+  "toolchain": {
+    "blender": "5.2 LTS",
+    "gltfTransform": "4.4.2"
+  }
+}

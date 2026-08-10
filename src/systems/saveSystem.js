@@ -8,8 +8,14 @@ import {
   getMissionRating,
   getNextMissionId,
 } from '../content/gameContent.js';
+import {
+  CANNON_SKINS,
+  DEFAULT_CANNON_SKIN_ID,
+  getDefaultCannonSkinIds,
+  resolveCannonSkinId,
+} from '../content/cannonSkins.js';
 
-export const SAVE_SCHEMA_VERSION = 2;
+export const SAVE_SCHEMA_VERSION = 3;
 export const SAVE_STORAGE_KEY = 'slop-zoo-cannon.save';
 export const SAVE_BACKUP_COUNT = 3;
 export const LEGACY_BEST_SCORE_KEY = 'slop-zoo-cannon-best';
@@ -105,7 +111,7 @@ export function createDefaultSave(now = new Date()) {
     unlocks: {
       ammo: defaultAmmo,
       modules: defaultModules,
-      cosmetics: [],
+      cosmetics: getDefaultCannonSkinIds(),
       codex: [],
     },
     economy: {
@@ -115,6 +121,7 @@ export function createDefaultSave(now = new Date()) {
     loadout: {
       ammo: defaultAmmo.slice(0, 3),
       module: defaultModules[0] ?? null,
+      cannonSkin: DEFAULT_CANNON_SKIN_ID,
     },
     tutorial: {
       seen: [],
@@ -410,6 +417,10 @@ export function migrateSave(input, options = {}) {
     save = migrateV1ToV2(save, options);
     version = 2;
   }
+  if (version === 2) {
+    save = migrateV2ToV3(save, options);
+    version = 3;
+  }
   if (version !== SAVE_SCHEMA_VERSION) {
     throw new SaveDataError(`No migration path exists for save schema ${version}.`);
   }
@@ -498,6 +509,17 @@ function migrateV1ToV2(source, options) {
   };
 }
 
+function migrateV2ToV3(source) {
+  return {
+    ...source,
+    schemaVersion: 3,
+    loadout: {
+      ...(source.loadout ?? {}),
+      cannonSkin: source.loadout?.cannonSkin ?? DEFAULT_CANNON_SKIN_ID,
+    },
+  };
+}
+
 function normalizeCurrentSave(source, options = {}) {
   const timestamp = toIsoTimestamp(options.now ?? source.updatedAt ?? source.createdAt);
   const save = createDefaultSave(source.createdAt ?? timestamp);
@@ -559,7 +581,10 @@ function normalizeCurrentSave(source, options = {}) {
     sourceUnlocks.modules,
     MODULES,
   );
-  save.unlocks.cosmetics = uniqueStrings(sourceUnlocks.cosmetics);
+  save.unlocks.cosmetics = uniqueStrings([
+    ...getDefaultCannonSkinIds(),
+    ...uniqueStrings(sourceUnlocks.cosmetics),
+  ]);
   save.unlocks.codex = uniqueStrings(sourceUnlocks.codex);
 
   // Unlock rewards are derivable progression state. Rebuild them when an old
@@ -582,6 +607,10 @@ function normalizeCurrentSave(source, options = {}) {
   save.loadout.module = save.unlocks.modules.includes(source.loadout?.module)
     ? source.loadout.module
     : (save.unlocks.modules[0] ?? null);
+  save.loadout.cannonSkin = resolveCannonSkinId(
+    source.loadout?.cannonSkin,
+    save.unlocks.cosmetics.filter((id) => CANNON_SKINS.some((skin) => skin.id === id)),
+  );
 
   save.tutorial.seen = uniqueStrings(source.tutorial?.seen);
   save.tutorial.completed = Boolean(source.tutorial?.completed);

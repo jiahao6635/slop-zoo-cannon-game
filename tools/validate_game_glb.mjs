@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -29,13 +30,46 @@ function fail(message) {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  if (!args[0]) fail('usage: node tools/validate_game_glb.mjs <asset.glb> [--manifest path]');
-  const manifestIndex = args.indexOf('--manifest');
+  if (!args[0] || args[0].startsWith('--')) {
+    fail(
+      'usage: node tools/validate_game_glb.mjs <asset.glb> [--manifest path] '
+      + '[--verify-manifest path] [--asset-id id] [--skin-id id] '
+      + '[--source path] [--output path]',
+    );
+  }
+  const options = {
+    manifestPath: null,
+    verifyManifestPath: null,
+    assetId: 'slop-zoo-cannon',
+    skinId: null,
+    source: 'blender/slop_zoo_game_assets.blend',
+    output: 'public/assets/slop-cannon.glb',
+  };
+  const optionNames = new Map([
+    ['--manifest', 'manifestPath'],
+    ['--verify-manifest', 'verifyManifestPath'],
+    ['--asset-id', 'assetId'],
+    ['--skin-id', 'skinId'],
+    ['--source', 'source'],
+    ['--output', 'output'],
+  ]);
+  for (let index = 1; index < args.length; index += 1) {
+    const argument = args[index];
+    const separator = argument.indexOf('=');
+    const option = separator >= 0 ? argument.slice(0, separator) : argument;
+    const key = optionNames.get(option);
+    if (!key) fail(`unknown argument: ${argument}`);
+    const value = separator >= 0 ? argument.slice(separator + 1) : args[index + 1];
+    if (!value || (separator < 0 && value.startsWith('--'))) fail(`missing value for ${option}`);
+    options[key] = key === 'manifestPath' || key === 'verifyManifestPath' ? resolve(value) : value;
+    if (separator < 0) index += 1;
+  }
+  if (options.manifestPath && options.verifyManifestPath) {
+    fail('--manifest and --verify-manifest cannot be used together');
+  }
   return {
     assetPath: resolve(args[0]),
-    manifestPath: manifestIndex >= 0 && args[manifestIndex + 1]
-      ? resolve(args[manifestIndex + 1])
-      : null,
+    ...options,
   };
 }
 
@@ -81,7 +115,7 @@ function requireTranslation(node, name, expected) {
   }
 }
 
-function inspectDocument(document) {
+function inspectDocument(document, expectedAssetId, expectedSkinId) {
   const nodes = document.nodes ?? [];
   const nodeIndices = new Map();
   nodes.forEach((node, index) => {
@@ -118,7 +152,12 @@ function inspectDocument(document) {
   }
 
   const root = nodes[nodeIndices.get('CannonAssetRoot')[0]];
-  if (root.extras?.asset_id !== 'slop-zoo-cannon') fail('root asset_id is missing');
+  if (root.extras?.asset_id !== expectedAssetId) {
+    fail(`root asset_id must be ${expectedAssetId}; found ${root.extras?.asset_id ?? 'missing'}`);
+  }
+  if (expectedSkinId !== null && root.extras?.skin_id !== expectedSkinId) {
+    fail(`root skin_id must be ${expectedSkinId}; found ${root.extras?.skin_id ?? 'missing'}`);
+  }
   if (!Number.isInteger(root.extras?.asset_version) || root.extras.asset_version < 3) {
     fail('root asset_version must be at least 3');
   }
@@ -179,6 +218,7 @@ function inspectDocument(document) {
 
   return {
     assetId: root.extras.asset_id,
+    ...(root.extras?.skin_id !== undefined ? { skinId: root.extras.skin_id } : {}),
     assetVersion: root.extras.asset_version,
     license: root.extras.license,
     nodeCount: nodes.length,
@@ -190,15 +230,23 @@ function inspectDocument(document) {
   };
 }
 
-const { assetPath, manifestPath } = parseArgs();
+const {
+  assetPath,
+  manifestPath,
+  verifyManifestPath,
+  assetId,
+  skinId,
+  source,
+  output,
+} = parseArgs();
 const buffer = readFileSync(assetPath);
 if (buffer.length > MAX_BYTES) fail(`file budget exceeded: ${buffer.length} > ${MAX_BYTES} bytes`);
 const document = parseGlb(buffer);
-const stats = inspectDocument(document);
+const stats = inspectDocument(document, assetId, skinId);
 const manifest = {
   ...stats,
-  source: 'blender/slop_zoo_game_assets.blend',
-  output: 'public/assets/slop-cannon.glb',
+  source,
+  output,
   bytes: buffer.length,
   sha256: createHash('sha256').update(buffer).digest('hex'),
   toolchain: {
@@ -208,7 +256,20 @@ const manifest = {
 };
 
 if (manifestPath) writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+if (verifyManifestPath) {
+  let committedManifest;
+  try {
+    committedManifest = JSON.parse(readFileSync(verifyManifestPath, 'utf8'));
+  } catch (error) {
+    fail(`unable to read manifest ${verifyManifestPath}: ${error.message}`);
+  }
+  if (!isDeepStrictEqual(committedManifest, manifest)) {
+    fail(`manifest is stale or mismatched: ${verifyManifestPath}`);
+  }
+  console.log(`MANIFEST_OK path=${verifyManifestPath}`);
+}
 console.log(
-  `ASSET_OK bytes=${manifest.bytes} nodes=${manifest.nodeCount} meshes=${manifest.meshCount} `
+  `ASSET_OK asset=${manifest.assetId} skin=${manifest.skinId ?? 'unspecified'} `
+  + `bytes=${manifest.bytes} nodes=${manifest.nodeCount} meshes=${manifest.meshCount} `
   + `primitives=${manifest.primitiveCount} materials=${manifest.materialCount} triangles=${manifest.triangleCount}`,
 );

@@ -35,14 +35,22 @@ function hasFxAncestor(node) {
 function configureMaterial(material) {
   if (!material) return;
   material.side = THREE.FrontSide;
-  material.envMapIntensity = /SlimeEnergy/i.test(material.name) ? 1.1 : 1.35;
+  material.envMapIntensity = /Energy/i.test(material.name) ? 1.1 : 1.35;
   if (/Gunmetal/i.test(material.name)) {
     material.metalness = Math.min(material.metalness, 0.78);
     material.roughness = Math.max(material.roughness, 0.28);
   }
-  if (/Brass/i.test(material.name)) {
-    material.metalness = Math.min(material.metalness, 0.86);
-    material.roughness = Math.max(material.roughness, 0.25);
+  if (/(?:Brass|ImperialGold|BambooGold|OceanCopper|StellarChrome)/i.test(material.name)) {
+    material.metalness = Math.min(material.metalness, 0.9);
+    material.roughness = Math.max(material.roughness, 0.2);
+  }
+  if (/(?:DragonRed|InkBamboo|AbyssNavy|NebulaMidnight)/i.test(material.name)) {
+    material.metalness = Math.min(material.metalness, 0.24);
+    material.roughness = Math.max(material.roughness, 0.19);
+  }
+  if (/(?:JadePorcelain|PandaPorcelain|CoralPearl|SolarCeramic)/i.test(material.name)) {
+    material.metalness = Math.min(material.metalness, 0.08);
+    material.roughness = Math.max(material.roughness, 0.15);
   }
   material.needsUpdate = true;
 }

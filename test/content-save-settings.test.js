@@ -3,8 +3,17 @@ import assert from 'node:assert/strict';
 
 import { MISSIONS, validateGameContent } from '../src/content/gameContent.js';
 import {
+  CANNON_SKINS,
+  DEFAULT_CANNON_SKIN_ID,
+  getDefaultCannonSkinIds,
+  resolveCannonSkinId,
+  validateCannonSkins,
+} from '../src/content/cannonSkins.js';
+import {
+  SAVE_SCHEMA_VERSION,
   createDefaultSave,
   isMissionUnlocked,
+  migrateSave,
   recordMissionResult,
 } from '../src/systems/saveSystem.js';
 import {
@@ -20,6 +29,57 @@ test('vertical-slice content is internally valid', () => {
   assert.deepEqual(validateGameContent(), []);
   assert.equal(MISSIONS.length, 5);
   assert.deepEqual(MISSIONS.map((mission) => mission.order), [1, 2, 3, 4, 5]);
+});
+
+test('all five cannon skins have valid permanent default unlocks', () => {
+  assert.deepEqual(validateCannonSkins(), []);
+  const expectedSkinIds = [
+    'classic',
+    'dragon-new-year',
+    'bamboo-guardian',
+    'abyssal-whale',
+    'stellar-voyager',
+  ];
+  assert.deepEqual(CANNON_SKINS.map((skin) => skin.id), expectedSkinIds);
+  assert.deepEqual(getDefaultCannonSkinIds(), expectedSkinIds);
+  assert.equal(CANNON_SKINS.find((skin) => skin.id === 'dragon-new-year')?.limited, true);
+  assert.equal(CANNON_SKINS.find((skin) => skin.id === 'bamboo-guardian')?.limited, false);
+  assert.equal(resolveCannonSkinId('stellar-voyager', expectedSkinIds), 'stellar-voyager');
+  assert.equal(resolveCannonSkinId('unknown', expectedSkinIds), DEFAULT_CANNON_SKIN_ID);
+});
+
+test('version 2 saves migrate to cannon skin loadout without losing cosmetic ownership', () => {
+  const version2 = createDefaultSave(new Date('2026-08-09T00:00:00.000Z'));
+  version2.schemaVersion = 2;
+  version2.unlocks.cosmetics = ['sector-07-restored'];
+  delete version2.loadout.cannonSkin;
+
+  const migrated = migrateSave(version2, { now: new Date('2026-08-10T00:00:00.000Z') });
+
+  assert.equal(SAVE_SCHEMA_VERSION, 3);
+  assert.equal(migrated.schemaVersion, 3);
+  assert.equal(migrated.loadout.cannonSkin, DEFAULT_CANNON_SKIN_ID);
+  assert.deepEqual(migrated.unlocks.cosmetics, [
+    'classic',
+    'dragon-new-year',
+    'bamboo-guardian',
+    'abyssal-whale',
+    'stellar-voyager',
+    'sector-07-restored',
+  ]);
+});
+
+test('saved catalogue skins remain equipped and invalid selections fall back to classic', () => {
+  const save = createDefaultSave(new Date('2026-08-10T00:00:00.000Z'));
+  save.loadout.cannonSkin = 'abyssal-whale';
+  const whale = migrateSave(save);
+  assert.equal(whale.loadout.cannonSkin, 'abyssal-whale');
+
+  save.loadout.cannonSkin = 'missing-seasonal-skin';
+  const normalized = migrateSave(save);
+  assert.equal(normalized.loadout.cannonSkin, DEFAULT_CANNON_SKIN_ID);
+  assert.ok(normalized.unlocks.cosmetics.includes('dragon-new-year'));
+  assert.ok(normalized.unlocks.cosmetics.includes('stellar-voyager'));
 });
 
 test('failed attempts do not pollute best results or unlock the next mission', () => {

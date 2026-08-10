@@ -1,0 +1,25 @@
+{
+  "assetId": "slop-zoo-cannon-stellar-voyager",
+  "skinId": "stellar-voyager",
+  "assetVersion": 3,
+  "license": "MIT",
+  "nodeCount": 18,
+  "meshCount": 8,
+  "primitiveCount": 14,
+  "materialCount": 4,
+  "triangleCount": 15284,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_materials_clearcoat",
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization"
+  ],
+  "source": "blender/slop_zoo_game_assets_stellar_voyager.blend",
+  "output": "public/assets/slop-cannon-stellar-voyager.glb",
+  "bytes": 109188,
+  "sha256": "2426ba5af02e8fa0d277cf40137a45e64be237d5ece1dfee1850176c3e847f07",
+  "toolchain": {
+    "blender": "5.2 LTS",
+    "gltfTransform": "4.4.2"
+  }
+}

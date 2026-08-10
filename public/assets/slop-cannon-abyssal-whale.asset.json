@@ -1,0 +1,25 @@
+{
+  "assetId": "slop-zoo-cannon-abyssal-whale",
+  "skinId": "abyssal-whale",
+  "assetVersion": 3,
+  "license": "MIT",
+  "nodeCount": 18,
+  "meshCount": 8,
+  "primitiveCount": 14,
+  "materialCount": 4,
+  "triangleCount": 15732,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_materials_clearcoat",
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization"
+  ],
+  "source": "blender/slop_zoo_game_assets_abyssal_whale.blend",
+  "output": "public/assets/slop-cannon-abyssal-whale.glb",
+  "bytes": 113600,
+  "sha256": "bbd157a5ddc471dc294999b2a9b2f1fb8f438f1c2335bb7230f499ee1b88295b",
+  "toolchain": {
+    "blender": "5.2 LTS",
+    "gltfTransform": "4.4.2"
+  }
+}

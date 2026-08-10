@@ -61,7 +61,8 @@ button {
 
 button:disabled,
 .mission-card.is-locked,
-.equipment-card.is-locked {
+.equipment-card.is-locked,
+.cannon-skin-card.is-locked {
   cursor: not-allowed;
   filter: grayscale(0.72);
   opacity: 0.42;
@@ -106,6 +107,7 @@ html.high-contrast .menu-shell {
 html.high-contrast .mission-card,
 html.high-contrast .equipment-card,
 html.high-contrast .module-card,
+html.high-contrast .cannon-skin-card,
 html.high-contrast .setting-row {
   border-color: rgba(255, 255, 255, 0.32);
 }
@@ -1421,6 +1423,241 @@ html.high-contrast .setting-row {
 .module-locked small {
   margin-top: 2px;
   font-size: 0.56rem;
+}
+
+.cannon-skin-loadout {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 174, 61, 0.16);
+}
+
+.section-heading--skin {
+  margin-bottom: 8px;
+}
+
+.cannon-skin-browser {
+  display: grid;
+  gap: 7px;
+}
+
+.cannon-skin-preview {
+  position: relative;
+  height: 92px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 210, 119, 0.3);
+  background: #071112;
+}
+
+.cannon-skin-preview::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 34%, rgba(4, 10, 11, 0.08) 58%, rgba(4, 10, 11, 0.88));
+  content: '';
+  pointer-events: none;
+}
+
+.cannon-skin-preview img {
+  display: block;
+  width: 78%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 48%;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 72%, rgba(0, 0, 0, 0.9) 84%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 72%, rgba(0, 0, 0, 0.9) 84%, transparent 100%);
+}
+
+#cannon-skin-preview-image[src*="dragon-new-year"] {
+  object-position: 50% 22%;
+}
+
+#cannon-skin-preview-image[src*="bamboo-guardian"] {
+  object-position: 50% 38%;
+}
+
+#cannon-skin-preview-image[src*="abyssal-whale"] {
+  object-position: 50% 42%;
+}
+
+#cannon-skin-preview-image[src*="stellar-voyager"] {
+  object-position: 50% 36%;
+}
+
+.cannon-skin-preview figcaption {
+  position: absolute;
+  z-index: 1;
+  right: 10px;
+  bottom: 9px;
+  display: flex;
+  max-width: 48%;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.cannon-skin-preview small {
+  color: var(--brass-light);
+  font-family: var(--display);
+  font-size: 0.44rem;
+  letter-spacing: 0.1em;
+}
+
+.cannon-skin-preview strong {
+  margin-top: 2px;
+  color: #fff4d8;
+  font-family: var(--display);
+  font-size: 0.84rem;
+  letter-spacing: 0.04em;
+}
+
+.cannon-skin-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 7px;
+}
+
+.cannon-skin-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  min-height: 62px;
+  padding: 5px 6px;
+  border: 1px solid rgba(160, 215, 197, 0.14);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.018);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+.cannon-skin-card:hover {
+  border-color: rgba(255, 210, 119, 0.62);
+  background: rgba(255, 174, 61, 0.055);
+  transform: translateX(2px);
+}
+
+.cannon-skin-card.is-equipped {
+  border-color: rgba(255, 210, 119, 0.72);
+  background: linear-gradient(90deg, rgba(255, 174, 61, 0.09), rgba(183, 255, 60, 0.035));
+  box-shadow: inset 2px 0 var(--brass-light);
+}
+
+.cannon-skin-card.is-loading {
+  border-color: var(--cyan);
+  cursor: progress;
+  box-shadow: inset 2px 0 var(--cyan), 0 0 18px rgba(72, 223, 208, 0.08);
+}
+
+.cannon-skin-card > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-bottom: 16px;
+}
+
+.cannon-skin-card small {
+  overflow: hidden;
+  color: var(--brass-light);
+  font-family: var(--display);
+  font-size: 0.46rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cannon-skin-card strong {
+  overflow: hidden;
+  margin: 1px 0;
+  font-family: var(--display);
+  font-size: 0.78rem;
+  letter-spacing: 0.045em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cannon-skin-card em {
+  display: none;
+}
+
+.cannon-skin-card > b {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  min-width: 44px;
+  padding: 2px 4px;
+  border: 0;
+  color: var(--brass-light);
+  font-family: var(--display);
+  font-size: 0.47rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.cannon-skin-card.is-loading > b {
+  border-color: rgba(72, 223, 208, 0.4);
+  color: var(--cyan);
+}
+
+.cannon-skin-card__icon {
+  display: grid;
+  width: 30px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255, 210, 119, 0.32);
+  color: var(--brass-light);
+  background: linear-gradient(145deg, #263638, #101a1c);
+  box-shadow: inset 0 0 16px rgba(183, 255, 60, 0.07);
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.cannon-skin-card[data-cannon-skin="dragon-new-year"] .cannon-skin-card__icon {
+  border-color: rgba(255, 214, 112, 0.7);
+  color: #ffe099;
+  background:
+    radial-gradient(circle at 68% 25%, rgba(255, 220, 117, 0.3), transparent 25%),
+    linear-gradient(145deg, #b92321, #5e080b 72%);
+  box-shadow: inset 0 0 18px rgba(255, 184, 55, 0.18), 0 0 12px rgba(197, 35, 31, 0.16);
+}
+
+.cannon-skin-card[data-cannon-skin="bamboo-guardian"] .cannon-skin-card__icon {
+  border-color: rgba(157, 236, 137, 0.68);
+  color: #d9ffb9;
+  background:
+    linear-gradient(90deg, transparent 44%, rgba(218, 255, 185, 0.17) 45% 54%, transparent 55%),
+    linear-gradient(145deg, #287a4b, #0d3928 74%);
+  box-shadow: inset 0 0 18px rgba(151, 255, 114, 0.16), 0 0 12px rgba(45, 156, 82, 0.14);
+}
+
+.cannon-skin-card[data-cannon-skin="abyssal-whale"] .cannon-skin-card__icon {
+  border-color: rgba(89, 223, 255, 0.68);
+  color: #a9f4ff;
+  background:
+    radial-gradient(ellipse at 55% 38%, rgba(116, 237, 255, 0.3), transparent 28%),
+    linear-gradient(145deg, #155d7c, #08243d 74%);
+  box-shadow: inset 0 0 18px rgba(55, 218, 255, 0.18), 0 0 12px rgba(31, 137, 193, 0.15);
+}
+
+.cannon-skin-card[data-cannon-skin="stellar-voyager"] .cannon-skin-card__icon {
+  border-color: rgba(204, 151, 255, 0.72);
+  color: #f0d8ff;
+  background:
+    radial-gradient(circle at 68% 24%, #fff 0 2%, transparent 4%),
+    radial-gradient(circle at 28% 70%, rgba(140, 225, 255, 0.85) 0 2%, transparent 4%),
+    linear-gradient(145deg, #503c92, #171b4d 74%);
+  box-shadow: inset 0 0 18px rgba(185, 106, 255, 0.2), 0 0 12px rgba(109, 80, 214, 0.18);
+}
+
+.cannon-skin-note {
+  margin: 7px 2px 0;
+  color: var(--ink-dim);
+  font-size: 0.53rem;
+  line-height: 1.45;
 }
 
 .loadout-tip {
@@ -3085,6 +3322,53 @@ html.high-contrast .setting-row {
   }
 }
 
+@media (max-height: 760px) and (min-width: 761px) {
+  .loadout-shell {
+    gap: 12px 22px;
+    padding-block: 20px;
+  }
+
+  .loadout-shell .menu-header {
+    padding-bottom: 10px;
+  }
+
+  .loadout-shell .menu-header h2 {
+    font-size: clamp(1.9rem, 2.5vw, 2rem);
+  }
+
+  .cannon-skin-loadout {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .cannon-skin-preview {
+    height: 76px;
+  }
+
+  .cannon-skin-options {
+    gap: 5px;
+  }
+
+  .cannon-skin-card {
+    min-height: 58px;
+    padding: 4px 5px;
+  }
+
+  .cannon-skin-card__icon {
+    width: 28px;
+    height: 38px;
+  }
+
+  .cannon-skin-note {
+    margin-top: 5px;
+  }
+
+  .loadout-tip {
+    margin-top: 8px;
+    padding: 8px 10px;
+  }
+}
+
 @media (pointer: coarse) {
   #fire-button {
     display: block;
@@ -3172,6 +3456,14 @@ html.high-contrast .setting-row {
   .settings-grid,
   .result-layout {
     grid-template-columns: 1fr;
+  }
+
+  .cannon-skin-preview {
+    height: clamp(108px, 18vw, 138px);
+  }
+
+  .cannon-skin-preview img {
+    width: 68%;
   }
 
   .settings-grid {
@@ -3323,19 +3615,56 @@ html.high-contrast .setting-row {
     min-height: 57px;
   }
 
+  .cannon-skin-preview {
+    height: 108px;
+  }
+
+  .cannon-skin-options {
+    grid-template-columns: none;
+    grid-auto-columns: minmax(230px, 82vw);
+    grid-auto-flow: column;
+    overflow-x: auto;
+    padding: 1px 1px 7px;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline mandatory;
+    scrollbar-width: thin;
+  }
+
   .equipment-card,
-  .module-card {
+  .module-card,
+  .cannon-skin-card {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
   .equipment-card > b,
-  .module-card > b {
+  .module-card > b,
+  .cannon-skin-card > b {
     display: none;
   }
 
+  .cannon-skin-card > span:nth-child(2) {
+    padding-bottom: 0;
+  }
+
+  .cannon-skin-card {
+    min-height: 82px;
+    scroll-snap-align: start;
+  }
+
   .equipment-card em,
-  .module-card em {
+  .module-card em,
+  .cannon-skin-card em {
     white-space: normal;
+  }
+
+  .cannon-skin-card em {
+    display: block;
+    margin-top: 2px;
+    overflow: visible;
+    color: var(--ink-muted);
+    font-size: 0.58rem;
+    font-style: normal;
+    line-height: 1.4;
   }
 
   .setting-row {

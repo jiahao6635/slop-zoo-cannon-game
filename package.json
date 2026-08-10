@@ -31,7 +31,7 @@
     "test": "node --test",
     "test:desktop": "node --test test/platform-desktop.test.js",
     "build": "vite build",
-    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && node --check src/platform/index.js && node --check src/platform/bootstrap.js && node --check src/render/cannonAsset.js && node --check src/render/dynamicResolution.js && node --check src/render/objectPool.js && node --check src/render/performanceMonitor.js && node --check desktop/main.js && node --check desktop/preload.cjs && node --check desktop/storage.js && node --check desktop/windowPolicy.js && node --check desktop/verifyDist.mjs && vite build && npm run check:desktop-dist && npm run check:assets",
+    "check": "npm run test && node --check src/main.js && node --check src/content/gameContent.js && node --check src/content/cannonSkins.js && node --check src/systems/saveSystem.js && node --check src/systems/inputSystem.js && node --check src/systems/settingsSystem.js && node --check src/platform/index.js && node --check src/platform/bootstrap.js && node --check src/render/cannonAsset.js && node --check src/render/dynamicResolution.js && node --check src/render/objectPool.js && node --check src/render/performanceMonitor.js && node --check desktop/main.js && node --check desktop/preload.cjs && node --check desktop/storage.js && node --check desktop/windowPolicy.js && node --check desktop/verifyDist.mjs && vite build && npm run check:desktop-dist && npm run check:assets",
     "preview": "vite preview --host 127.0.0.1",
     "desktop:dev": "node desktop/dev.mjs",
     "desktop:start": "npm run build && electron .",
@@ -41,8 +41,21 @@
     "check:desktop-dist": "node desktop/verifyDist.mjs",
     "sanitize:assets": "node tools/sanitize_assets.mjs",
     "upgrade:assets": "node tools/upgrade_assets.mjs",
+    "upgrade:assets:dragon": "node tools/upgrade_assets.mjs --variant dragon-new-year",
+    "upgrade:assets:bamboo": "node tools/upgrade_assets.mjs --variant bamboo-guardian",
+    "upgrade:assets:abyssal": "node tools/upgrade_assets.mjs --variant abyssal-whale",
+    "upgrade:assets:stellar": "node tools/upgrade_assets.mjs --variant stellar-voyager",
     "export:assets": "node tools/export_assets.mjs",
-    "check:assets": "node tools/validate_game_glb.mjs public/assets/slop-cannon.glb"
+    "export:assets:dragon": "node tools/export_assets.mjs --variant dragon-new-year",
+    "export:assets:bamboo": "node tools/export_assets.mjs --variant bamboo-guardian",
+    "export:assets:abyssal": "node tools/export_assets.mjs --variant abyssal-whale",
+    "export:assets:stellar": "node tools/export_assets.mjs --variant stellar-voyager",
+    "check:assets": "npm run check:assets:classic && npm run check:assets:dragon && npm run check:assets:bamboo && npm run check:assets:abyssal && npm run check:assets:stellar",
+    "check:assets:classic": "node tools/validate_game_glb.mjs public/assets/slop-cannon.glb --verify-manifest public/assets/slop-cannon.asset.json",
+    "check:assets:dragon": "node tools/validate_game_glb.mjs public/assets/slop-cannon-dragon-new-year.glb --verify-manifest public/assets/slop-cannon-dragon-new-year.asset.json --asset-id slop-zoo-cannon-dragon-new-year --skin-id dragon-new-year --source blender/slop_zoo_game_assets_dragon_new_year.blend --output public/assets/slop-cannon-dragon-new-year.glb",
+    "check:assets:bamboo": "node tools/validate_game_glb.mjs public/assets/slop-cannon-bamboo-guardian.glb --verify-manifest public/assets/slop-cannon-bamboo-guardian.asset.json --asset-id slop-zoo-cannon-bamboo-guardian --skin-id bamboo-guardian --source blender/slop_zoo_game_assets_bamboo_guardian.blend --output public/assets/slop-cannon-bamboo-guardian.glb",
+    "check:assets:abyssal": "node tools/validate_game_glb.mjs public/assets/slop-cannon-abyssal-whale.glb --verify-manifest public/assets/slop-cannon-abyssal-whale.asset.json --asset-id slop-zoo-cannon-abyssal-whale --skin-id abyssal-whale --source blender/slop_zoo_game_assets_abyssal_whale.blend --output public/assets/slop-cannon-abyssal-whale.glb",
+    "check:assets:stellar": "node tools/validate_game_glb.mjs public/assets/slop-cannon-stellar-voyager.glb --verify-manifest public/assets/slop-cannon-stellar-voyager.asset.json --asset-id slop-zoo-cannon-stellar-voyager --skin-id stellar-voyager --source blender/slop_zoo_game_assets_stellar_voyager.blend --output public/assets/slop-cannon-stellar-voyager.glb"
   },
   "dependencies": {
     "three": "0.185.1"

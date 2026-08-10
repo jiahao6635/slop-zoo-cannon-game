@@ -1,0 +1,25 @@
+{
+  "assetId": "slop-zoo-cannon-dragon-new-year",
+  "skinId": "dragon-new-year",
+  "assetVersion": 3,
+  "license": "MIT",
+  "nodeCount": 18,
+  "meshCount": 8,
+  "primitiveCount": 13,
+  "materialCount": 4,
+  "triangleCount": 16324,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_materials_clearcoat",
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization"
+  ],
+  "source": "blender/slop_zoo_game_assets_dragon_new_year.blend",
+  "output": "public/assets/slop-cannon-dragon-new-year.glb",
+  "bytes": 115556,
+  "sha256": "b88d4ca2304bf7968ff8db09550e7420b648d98765356d52c8e672e24b0cdda1",
+  "toolchain": {
+    "blender": "5.2 LTS",
+    "gltfTransform": "4.4.2"
+  }
+}

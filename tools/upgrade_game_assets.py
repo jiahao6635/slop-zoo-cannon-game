@@ -18,6 +18,22 @@ from mathutils import Vector
 
 UPGRADE_VERSION = 3
 GENERATED_PREFIX = "CANNON_V3_"
+DRAGON_PREFIX = "CANNON_DRAGON_"
+BAMBOO_PREFIX = "CANNON_BAMBOO_"
+ABYSSAL_PREFIX = "CANNON_ABYSSAL_"
+STELLAR_PREFIX = "CANNON_STELLAR_"
+SKIN_CLASSIC = "classic"
+SKIN_DRAGON_NEW_YEAR = "dragon-new-year"
+SKIN_BAMBOO_GUARDIAN = "bamboo-guardian"
+SKIN_ABYSSAL_WHALE = "abyssal-whale"
+SKIN_STELLAR_VOYAGER = "stellar-voyager"
+SUPPORTED_SKINS = (
+    SKIN_CLASSIC,
+    SKIN_DRAGON_NEW_YEAR,
+    SKIN_BAMBOO_GUARDIAN,
+    SKIN_ABYSSAL_WHALE,
+    SKIN_STELLAR_VOYAGER,
+)
 MAX_SOURCE_TRIANGLES = 18_000
 GENERATED_GROUPS = {
     "CannonChargeGlow",
@@ -40,6 +56,11 @@ def parse_args() -> argparse.Namespace:
     argv = argv[argv.index("--") + 1 :] if "--" in argv else []
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-blend", required=True)
+    parser.add_argument(
+        "--skin",
+        choices=SUPPORTED_SKINS,
+        default=SKIN_CLASSIC,
+    )
     return parser.parse_args(argv)
 
 
@@ -90,12 +111,176 @@ def get_material(
     return material
 
 
-def tune_materials() -> tuple[
+def tune_materials(skin: str) -> tuple[
     bpy.types.Material,
     bpy.types.Material,
     bpy.types.Material,
     bpy.types.Material,
 ]:
+    if skin == SKIN_DRAGON_NEW_YEAR:
+        dragon_red = get_material(
+            "MAT_DragonRed_Lacquer",
+            (0.42, 0.009, 0.014, 1.0),
+            metallic=0.2,
+            roughness=0.2,
+            emission=(0.12, 0.001, 0.002, 1.0),
+            emission_strength=0.18,
+            coat_weight=0.42,
+            coat_roughness=0.14,
+        )
+        imperial_gold = get_material(
+            "MAT_ImperialGold",
+            (0.82, 0.35, 0.035, 1.0),
+            metallic=0.9,
+            roughness=0.2,
+            coat_weight=0.16,
+            coat_roughness=0.16,
+        )
+        jade_porcelain = get_material(
+            "MAT_JadePorcelain",
+            (0.66, 0.9, 0.72, 1.0),
+            metallic=0.04,
+            roughness=0.16,
+            emission=(0.02, 0.08, 0.035, 1.0),
+            emission_strength=0.12,
+            coat_weight=0.48,
+            coat_roughness=0.1,
+        )
+        jade_energy = get_material(
+            "MAT_JadeEnergy",
+            (0.02, 0.82, 0.28, 1.0),
+            metallic=0.02,
+            roughness=0.16,
+            emission=(0.018, 1.0, 0.24, 1.0),
+            emission_strength=4.2,
+            coat_weight=0.28,
+            coat_roughness=0.08,
+        )
+        return dragon_red, imperial_gold, jade_porcelain, jade_energy
+
+    if skin == SKIN_BAMBOO_GUARDIAN:
+        ink_bamboo = get_material(
+            "MAT_InkBamboo_Lacquer",
+            (0.018, 0.24, 0.075, 1.0),
+            metallic=0.3,
+            roughness=0.22,
+            emission=(0.002, 0.035, 0.008, 1.0),
+            emission_strength=0.14,
+            coat_weight=0.4,
+            coat_roughness=0.13,
+        )
+        bamboo_gold = get_material(
+            "MAT_BambooGold",
+            (0.62, 0.31, 0.045, 1.0),
+            metallic=0.86,
+            roughness=0.23,
+            coat_weight=0.16,
+            coat_roughness=0.18,
+        )
+        panda_porcelain = get_material(
+            "MAT_PandaPorcelain",
+            (0.78, 0.88, 0.73, 1.0),
+            metallic=0.035,
+            roughness=0.17,
+            emission=(0.025, 0.055, 0.02, 1.0),
+            emission_strength=0.1,
+            coat_weight=0.5,
+            coat_roughness=0.09,
+        )
+        bamboo_energy = get_material(
+            "MAT_BambooEnergy",
+            (0.08, 0.84, 0.18, 1.0),
+            metallic=0.02,
+            roughness=0.15,
+            emission=(0.055, 1.0, 0.14, 1.0),
+            emission_strength=4.4,
+            coat_weight=0.26,
+            coat_roughness=0.08,
+        )
+        return ink_bamboo, bamboo_gold, panda_porcelain, bamboo_energy
+
+    if skin == SKIN_ABYSSAL_WHALE:
+        abyss_navy = get_material(
+            "MAT_AbyssNavy_Enamel",
+            (0.008, 0.045, 0.15, 1.0),
+            metallic=0.58,
+            roughness=0.24,
+            emission=(0.001, 0.01, 0.055, 1.0),
+            emission_strength=0.2,
+            coat_weight=0.34,
+            coat_roughness=0.14,
+        )
+        ocean_copper = get_material(
+            "MAT_OceanCopper",
+            (0.56, 0.17, 0.045, 1.0),
+            metallic=0.84,
+            roughness=0.27,
+            coat_weight=0.12,
+            coat_roughness=0.2,
+        )
+        coral_pearl = get_material(
+            "MAT_CoralPearl",
+            (0.94, 0.22, 0.24, 1.0),
+            metallic=0.08,
+            roughness=0.2,
+            emission=(0.18, 0.012, 0.018, 1.0),
+            emission_strength=0.24,
+            coat_weight=0.38,
+            coat_roughness=0.11,
+        )
+        biolume_energy = get_material(
+            "MAT_BiolumeEnergy",
+            (0.015, 0.62, 0.9, 1.0),
+            metallic=0.02,
+            roughness=0.13,
+            emission=(0.008, 0.78, 1.0, 1.0),
+            emission_strength=5.0,
+            coat_weight=0.3,
+            coat_roughness=0.07,
+        )
+        return abyss_navy, ocean_copper, coral_pearl, biolume_energy
+
+    if skin == SKIN_STELLAR_VOYAGER:
+        nebula_midnight = get_material(
+            "MAT_NebulaMidnight",
+            (0.055, 0.012, 0.19, 1.0),
+            metallic=0.7,
+            roughness=0.21,
+            emission=(0.012, 0.002, 0.07, 1.0),
+            emission_strength=0.22,
+            coat_weight=0.4,
+            coat_roughness=0.12,
+        )
+        stellar_chrome = get_material(
+            "MAT_StellarChrome",
+            (0.58, 0.72, 0.9, 1.0),
+            metallic=0.94,
+            roughness=0.16,
+            coat_weight=0.2,
+            coat_roughness=0.12,
+        )
+        solar_ceramic = get_material(
+            "MAT_SolarCeramic",
+            (0.94, 0.32, 0.035, 1.0),
+            metallic=0.22,
+            roughness=0.18,
+            emission=(0.24, 0.035, 0.002, 1.0),
+            emission_strength=0.32,
+            coat_weight=0.44,
+            coat_roughness=0.1,
+        )
+        starlight_energy = get_material(
+            "MAT_StarlightEnergy",
+            (0.08, 0.56, 1.0, 1.0),
+            metallic=0.02,
+            roughness=0.12,
+            emission=(0.34, 0.035, 1.0, 1.0),
+            emission_strength=4.8,
+            coat_weight=0.32,
+            coat_roughness=0.06,
+        )
+        return nebula_midnight, stellar_chrome, solar_ceramic, starlight_energy
+
     gunmetal = get_material(
         "MAT_Gunmetal_Refined",
         (0.028, 0.105, 0.12, 1.0),
@@ -380,6 +565,37 @@ def add_cylinder_between(
         material,
         tuple(midpoint),
         radius=radius,
+        depth=direction.length,
+        rotation=tuple(rotation),
+        vertices=vertices,
+    )
+
+
+def add_cone_between(
+    name: str,
+    parent: bpy.types.Object,
+    material: bpy.types.Material,
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+    *,
+    radius_start: float,
+    radius_end: float,
+    vertices: int = 8,
+) -> bpy.types.Object:
+    start_vector = Vector(start)
+    end_vector = Vector(end)
+    direction = end_vector - start_vector
+    if direction.length <= 0.000001:
+        raise RuntimeError(f"Cannot build zero-length cone: {name}")
+    rotation = direction.to_track_quat("Z", "Y").to_euler()
+    midpoint = (start_vector + end_vector) * 0.5
+    return add_cone(
+        name,
+        parent,
+        material,
+        tuple(midpoint),
+        radius1=radius_start,
+        radius2=radius_end,
         depth=direction.length,
         rotation=tuple(rotation),
         vertices=vertices,
@@ -785,6 +1001,742 @@ def build_recoil_body(
         )
 
 
+def build_dragon_base_decor(
+    root: bpy.types.Object,
+    imperial_gold: bpy.types.Material,
+    jade_porcelain: bpy.types.Material,
+) -> None:
+    for label, axis_x, axis_y in (
+        ("N", 0.0, 1.0),
+        ("E", 1.0, 0.0),
+        ("S", 0.0, -1.0),
+        ("W", -1.0, 0.0),
+    ):
+        if axis_x == 0.0:
+            plaque_scale = (0.31, 0.028, 0.07)
+            puff_scale = (0.135, 0.042, 0.085)
+        else:
+            plaque_scale = (0.028, 0.31, 0.07)
+            puff_scale = (0.042, 0.135, 0.085)
+        add_cube(
+            f"{DRAGON_PREFIX}CloudPlaque_{label}",
+            root,
+            imperial_gold,
+            (axis_x * 0.895, axis_y * 0.895, 0.55),
+            plaque_scale,
+            bevel=0.015,
+        )
+        for index, (offset, height, size) in enumerate(
+            ((-0.17, 0.0, 0.88), (0.0, 0.035, 1.08), (0.17, 0.0, 0.88))
+        ):
+            location = (
+                axis_x * 0.925 + (offset if axis_y else 0.0),
+                axis_y * 0.925 + (offset if axis_x else 0.0),
+                0.55 + height,
+            )
+            add_ico_sphere(
+                f"{DRAGON_PREFIX}CloudPuff_{label}_{index}",
+                root,
+                jade_porcelain,
+                location,
+                tuple(component * size for component in puff_scale),
+                subdivisions=1,
+            )
+
+
+def build_dragon_lanterns(
+    yaw: bpy.types.Object,
+    dragon_red: bpy.types.Material,
+    imperial_gold: bpy.types.Material,
+) -> None:
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        center = (-0.34, side * 0.82, 0.78)
+        add_cylinder_between(
+            f"{DRAGON_PREFIX}Lantern_{label}_Hanger",
+            yaw,
+            imperial_gold,
+            (-0.08, side * 0.68, 1.22),
+            (-0.34, side * 0.82, 1.06),
+            radius=0.018,
+            vertices=8,
+        )
+        add_uv_sphere(
+            f"{DRAGON_PREFIX}Lantern_{label}_Body",
+            yaw,
+            dragon_red,
+            center,
+            (0.2, 0.15, 0.25),
+            segments=12,
+            rings=6,
+        )
+        for cap_index, z in enumerate((0.515, 1.045)):
+            add_cylinder(
+                f"{DRAGON_PREFIX}Lantern_{label}_Cap_{cap_index}",
+                yaw,
+                imperial_gold,
+                (center[0], center[1], z),
+                radius=0.12,
+                depth=0.06,
+                vertices=12,
+                bevel=0.008,
+            )
+        for rail_index, x_offset in enumerate((-0.16, 0.16)):
+            add_cylinder(
+                f"{DRAGON_PREFIX}Lantern_{label}_Rail_{rail_index}",
+                yaw,
+                imperial_gold,
+                (center[0] + x_offset, center[1], center[2]),
+                radius=0.014,
+                depth=0.4,
+                vertices=8,
+            )
+        add_cylinder(
+            f"{DRAGON_PREFIX}Lantern_{label}_TasselCord",
+            yaw,
+            imperial_gold,
+            (center[0], center[1], 0.39),
+            radius=0.018,
+            depth=0.2,
+            vertices=8,
+        )
+        add_cone(
+            f"{DRAGON_PREFIX}Lantern_{label}_Tassel",
+            yaw,
+            imperial_gold,
+            (center[0], center[1], 0.25),
+            radius1=0.065,
+            radius2=0.025,
+            depth=0.16,
+            vertices=8,
+        )
+
+
+def build_dragon_recoil_decor(
+    recoil: bpy.types.Object,
+    imperial_gold: bpy.types.Material,
+    jade_porcelain: bpy.types.Material,
+) -> None:
+    scale_positions = (1.46, 1.68, 1.92, 2.14, 2.38, 2.6)
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        for index, x in enumerate(scale_positions):
+            add_cube(
+                f"{DRAGON_PREFIX}Scale_{label}_{index:02d}",
+                recoil,
+                imperial_gold,
+                (x, side * 0.284, 0.19),
+                (0.09, 0.018, 0.06),
+                (0.0, math.pi / 4.0, 0.0),
+                bevel=0.004,
+            )
+
+        eye = (3.055, side * 0.305, 0.49)
+        add_torus(
+            f"{DRAGON_PREFIX}EyeHousing_{label}",
+            recoil,
+            imperial_gold,
+            eye,
+            major_radius=0.09,
+            minor_radius=0.025,
+            rotation=(math.pi / 2.0, 0.0, 0.0),
+            major_segments=16,
+            minor_segments=4,
+        )
+        add_cone_between(
+            f"{DRAGON_PREFIX}Brow_{label}",
+            recoil,
+            imperial_gold,
+            (2.91, side * 0.31, 0.595),
+            (3.18, side * 0.315, 0.56),
+            radius_start=0.036,
+            radius_end=0.018,
+            vertices=8,
+        )
+
+        horn_points = (
+            (2.86, side * 0.23, 0.62),
+            (2.65, side * 0.34, 0.8),
+            (2.39, side * 0.43, 0.91),
+            (2.17, side * 0.48, 1.03),
+        )
+        horn_radii = ((0.078, 0.06), (0.06, 0.038), (0.038, 0.006))
+        for index, (start, end) in enumerate(zip(horn_points, horn_points[1:])):
+            add_cone_between(
+                f"{DRAGON_PREFIX}Antler_{label}_{index}",
+                recoil,
+                imperial_gold,
+                start,
+                end,
+                radius_start=horn_radii[index][0],
+                radius_end=horn_radii[index][1],
+                vertices=8,
+            )
+        for branch_index, (start, end) in enumerate(
+            (
+                (
+                    (2.62, side * 0.35, 0.81),
+                    (2.53, side * 0.44, 1.02),
+                ),
+                (
+                    (2.4, side * 0.43, 0.91),
+                    (2.3, side * 0.54, 1.08),
+                ),
+            )
+        ):
+            add_cone_between(
+                f"{DRAGON_PREFIX}Antler_{label}_Branch_{branch_index}",
+                recoil,
+                imperial_gold,
+                start,
+                end,
+                radius_start=0.034,
+                radius_end=0.005,
+                vertices=8,
+            )
+
+        whisker_points = (
+            (3.29, side * 0.29, 0.25),
+            (3.13, side * 0.46, 0.15),
+            (2.85, side * 0.62, 0.035),
+            (2.54, side * 0.68, -0.07),
+        )
+        whisker_radii = ((0.028, 0.023), (0.023, 0.016), (0.016, 0.004))
+        for index, (start, end) in enumerate(zip(whisker_points, whisker_points[1:])):
+            add_cone_between(
+                f"{DRAGON_PREFIX}Whisker_{label}_{index}",
+                recoil,
+                imperial_gold,
+                start,
+                end,
+                radius_start=whisker_radii[index][0],
+                radius_end=whisker_radii[index][1],
+                vertices=8,
+            )
+
+        add_cone_between(
+            f"{DRAGON_PREFIX}Fang_{label}",
+            recoil,
+            jade_porcelain,
+            (3.27, side * 0.26, 0.18),
+            (3.49, side * 0.28, 0.055),
+            radius_start=0.06,
+            radius_end=0.006,
+            vertices=8,
+        )
+
+    for index, (x, radius, height) in enumerate(
+        ((1.22, 0.08, 0.2), (1.6, 0.075, 0.19), (1.98, 0.07, 0.18),
+         (2.36, 0.062, 0.16), (2.68, 0.052, 0.14))
+    ):
+        add_cone(
+            f"{DRAGON_PREFIX}Spine_{index}",
+            recoil,
+            imperial_gold,
+            (x, 0.0, 0.48 + height * 0.5),
+            radius1=radius,
+            radius2=0.005,
+            depth=height,
+            vertices=8,
+        )
+
+    add_torus(
+        f"{DRAGON_PREFIX}PearlHalo",
+        recoil,
+        imperial_gold,
+        (2.84, 0.0, 0.75),
+        major_radius=0.145,
+        minor_radius=0.022,
+        rotation=(math.pi / 2.0, 0.0, 0.0),
+        major_segments=16,
+        minor_segments=4,
+    )
+
+
+def build_bamboo_guardian_decor(
+    root: bpy.types.Object,
+    yaw: bpy.types.Object,
+    recoil: bpy.types.Object,
+    ink_bamboo: bpy.types.Material,
+    bamboo_gold: bpy.types.Material,
+    panda_porcelain: bpy.types.Material,
+) -> None:
+    stalk_specs = (
+        (0.76, 0.0, 0.0),
+        (-0.76, 0.0, math.pi),
+        (0.0, 0.76, math.pi / 2.0),
+        (0.0, -0.76, -math.pi / 2.0),
+    )
+    for index, (x, y, angle) in enumerate(stalk_specs):
+        add_cylinder(
+            f"{BAMBOO_PREFIX}BaseStalk_{index}",
+            root,
+            ink_bamboo,
+            (x, y, 0.61),
+            radius=0.055,
+            depth=0.46,
+            vertices=10,
+            bevel=0.006,
+        )
+        for node_index, z in enumerate((0.47, 0.63, 0.79)):
+            add_cylinder(
+                f"{BAMBOO_PREFIX}BaseNode_{index}_{node_index}",
+                root,
+                bamboo_gold,
+                (x, y, z),
+                radius=0.069,
+                depth=0.026,
+                vertices=10,
+            )
+        for leaf_index, (height, direction) in enumerate(((0.58, -1.0), (0.74, 1.0))):
+            leaf_angle = angle + direction * 0.72
+            add_cube(
+                f"{BAMBOO_PREFIX}BaseLeaf_{index}_{leaf_index}",
+                root,
+                panda_porcelain,
+                (
+                    x + math.cos(leaf_angle) * 0.115,
+                    y + math.sin(leaf_angle) * 0.115,
+                    height,
+                ),
+                (0.14, 0.034, 0.028),
+                (0.0, direction * 0.22, leaf_angle),
+                bevel=0.012,
+            )
+
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        add_cylinder_between(
+            f"{BAMBOO_PREFIX}CharmCord_{label}",
+            yaw,
+            bamboo_gold,
+            (-0.2, side * 0.58, 1.16),
+            (-0.34, side * 0.72, 0.9),
+            radius=0.018,
+            vertices=8,
+        )
+        add_cylinder(
+            f"{BAMBOO_PREFIX}CharmBamboo_{label}",
+            yaw,
+            ink_bamboo,
+            (-0.34, side * 0.72, 0.74),
+            radius=0.07,
+            depth=0.3,
+            vertices=10,
+            bevel=0.008,
+        )
+        for z in (0.61, 0.75, 0.88):
+            add_cylinder(
+                f"{BAMBOO_PREFIX}CharmNode_{label}_{z:+.2f}",
+                yaw,
+                bamboo_gold,
+                (-0.34, side * 0.72, z),
+                radius=0.083,
+                depth=0.025,
+                vertices=10,
+            )
+        add_ico_sphere(
+            f"{BAMBOO_PREFIX}CharmPaw_{label}",
+            yaw,
+            panda_porcelain,
+            (-0.34, side * 0.72, 0.52),
+            (0.095, 0.06, 0.09),
+            subdivisions=1,
+        )
+
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        add_ico_sphere(
+            f"{BAMBOO_PREFIX}PandaEar_{label}",
+            recoil,
+            ink_bamboo,
+            (-0.32, side * 0.43, 1.05),
+            (0.18, 0.075, 0.18),
+            subdivisions=1,
+        )
+        add_ico_sphere(
+            f"{BAMBOO_PREFIX}PandaEarInner_{label}",
+            recoil,
+            panda_porcelain,
+            (-0.31, side * 0.475, 1.05),
+            (0.095, 0.025, 0.095),
+            subdivisions=1,
+        )
+        add_uv_sphere(
+            f"{BAMBOO_PREFIX}PandaCheek_{label}",
+            recoil,
+            panda_porcelain,
+            (3.03, side * 0.29, 0.43),
+            (0.15, 0.035, 0.12),
+            segments=10,
+            rings=5,
+        )
+        add_uv_sphere(
+            f"{BAMBOO_PREFIX}PandaEyePatch_{label}",
+            recoil,
+            ink_bamboo,
+            (3.06, side * 0.326, 0.46),
+            (0.09, 0.018, 0.064),
+            segments=8,
+            rings=4,
+        )
+        for leaf_index, x in enumerate((1.55, 1.94, 2.33)):
+            add_cube(
+                f"{BAMBOO_PREFIX}BarrelLeaf_{label}_{leaf_index}",
+                recoil,
+                panda_porcelain if leaf_index % 2 == 0 else bamboo_gold,
+                (x, side * 0.315, 0.34 - leaf_index * 0.045),
+                (0.13, 0.024, 0.047),
+                (0.0, (-0.36 if side > 0 else 0.36), side * (0.42 + leaf_index * 0.08)),
+                bevel=0.01,
+            )
+
+    for index, x in enumerate((1.42, 2.42)):
+        add_torus(
+            f"{BAMBOO_PREFIX}BarrelNode_{index}",
+            recoil,
+            bamboo_gold,
+            (x, 0.0, 0.19),
+            major_radius=0.305,
+            minor_radius=0.025,
+            rotation=(0.0, math.pi / 2.0, 0.0),
+            major_segments=20,
+            minor_segments=5,
+        )
+    add_ico_sphere(
+        f"{BAMBOO_PREFIX}PandaNose",
+        recoil,
+        bamboo_gold,
+        (3.24, 0.0, 0.56),
+        (0.08, 0.055, 0.052),
+        subdivisions=1,
+    )
+
+
+def build_abyssal_whale_decor(
+    root: bpy.types.Object,
+    yaw: bpy.types.Object,
+    recoil: bpy.types.Object,
+    abyss_navy: bpy.types.Material,
+    ocean_copper: bpy.types.Material,
+    coral_pearl: bpy.types.Material,
+) -> None:
+    for cluster_index, degrees in enumerate((35.0, 145.0, 225.0, 315.0)):
+        angle = math.radians(degrees)
+        base = (math.cos(angle) * 0.83, math.sin(angle) * 0.83, 0.46)
+        tips = (
+            (
+                base[0] + math.cos(angle) * 0.11,
+                base[1] + math.sin(angle) * 0.11,
+                0.78,
+            ),
+            (
+                base[0] + math.cos(angle + 0.72) * 0.16,
+                base[1] + math.sin(angle + 0.72) * 0.16,
+                0.69,
+            ),
+            (
+                base[0] + math.cos(angle - 0.72) * 0.14,
+                base[1] + math.sin(angle - 0.72) * 0.14,
+                0.63,
+            ),
+        )
+        for branch_index, tip in enumerate(tips):
+            add_cone_between(
+                f"{ABYSSAL_PREFIX}Coral_{cluster_index}_{branch_index}",
+                root,
+                coral_pearl,
+                base,
+                tip,
+                radius_start=0.055 if branch_index == 0 else 0.04,
+                radius_end=0.012,
+                vertices=8,
+            )
+        add_ico_sphere(
+            f"{ABYSSAL_PREFIX}Barnacle_{cluster_index}",
+            root,
+            ocean_copper,
+            base,
+            (0.09, 0.09, 0.065),
+            subdivisions=1,
+        )
+
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        add_torus(
+            f"{ABYSSAL_PREFIX}BasePorthole_{label}",
+            root,
+            ocean_copper,
+            (0.0, side * 0.895, 0.66),
+            major_radius=0.15,
+            minor_radius=0.027,
+            rotation=(math.pi / 2.0, 0.0, 0.0),
+            major_segments=16,
+            minor_segments=4,
+        )
+        add_uv_sphere(
+            f"{ABYSSAL_PREFIX}BasePortholeGlass_{label}",
+            root,
+            abyss_navy,
+            (0.0, side * 0.91, 0.66),
+            (0.13, 0.025, 0.13),
+            segments=10,
+            rings=5,
+        )
+        add_cylinder_between(
+            f"{ABYSSAL_PREFIX}BuoyHanger_{label}",
+            yaw,
+            ocean_copper,
+            (-0.08, side * 0.62, 1.18),
+            (-0.42, side * 0.78, 0.98),
+            radius=0.018,
+            vertices=8,
+        )
+        add_uv_sphere(
+            f"{ABYSSAL_PREFIX}BuoyBody_{label}",
+            yaw,
+            coral_pearl,
+            (-0.43, side * 0.79, 0.78),
+            (0.14, 0.11, 0.22),
+            segments=10,
+            rings=5,
+        )
+        for z in (0.56, 1.0):
+            add_cylinder(
+                f"{ABYSSAL_PREFIX}BuoyCap_{label}_{z:+.2f}",
+                yaw,
+                ocean_copper,
+                (-0.43, side * 0.79, z),
+                radius=0.105,
+                depth=0.045,
+                vertices=10,
+                bevel=0.006,
+            )
+
+        add_cube(
+            f"{ABYSSAL_PREFIX}WhaleFlipper_{label}",
+            recoil,
+            coral_pearl,
+            (1.73, side * 0.39, 0.02),
+            (0.3, 0.045, 0.1),
+            (0.0, side * -0.24, side * 0.2),
+            bevel=0.025,
+        )
+        add_torus(
+            f"{ABYSSAL_PREFIX}WhaleEyeHousing_{label}",
+            recoil,
+            ocean_copper,
+            (3.02, side * 0.3, 0.48),
+            major_radius=0.085,
+            minor_radius=0.022,
+            rotation=(math.pi / 2.0, 0.0, 0.0),
+            major_segments=16,
+            minor_segments=4,
+        )
+        for slit_index, x in enumerate((2.54, 2.72, 2.88)):
+            add_cube(
+                f"{ABYSSAL_PREFIX}Gill_{label}_{slit_index}",
+                recoil,
+                ocean_copper,
+                (x, side * 0.292, 0.21 - slit_index * 0.025),
+                (0.045, 0.016, 0.095),
+                (0.0, side * 0.24, side * -0.18),
+                bevel=0.006,
+            )
+
+    add_cube(
+        f"{ABYSSAL_PREFIX}DorsalFin",
+        recoil,
+        coral_pearl,
+        (1.56, 0.0, 0.55),
+        (0.27, 0.045, 0.17),
+        (0.0, -0.34, 0.0),
+        bevel=0.025,
+    )
+    for side in (-1.0, 1.0):
+        add_cube(
+            f"{ABYSSAL_PREFIX}TailFin_{'L' if side > 0 else 'R'}",
+            recoil,
+            coral_pearl,
+            (-0.86, side * 0.28, 0.12),
+            (0.22, 0.055, 0.13),
+            (0.0, side * 0.3, side * 0.44),
+            bevel=0.025,
+        )
+    for index, x in enumerate((0.75, 1.17, 2.2)):
+        add_ico_sphere(
+            f"{ABYSSAL_PREFIX}BarnacleRecoil_{index}",
+            recoil,
+            coral_pearl,
+            (x, -0.31 + index * 0.31, 0.45 - index * 0.08),
+            (0.07, 0.055, 0.065),
+            subdivisions=1,
+        )
+    add_torus(
+        f"{ABYSSAL_PREFIX}BlowholeRim",
+        recoil,
+        ocean_copper,
+        (2.72, 0.0, 0.515),
+        major_radius=0.105,
+        minor_radius=0.022,
+        major_segments=16,
+        minor_segments=4,
+    )
+
+
+def build_stellar_voyager_decor(
+    root: bpy.types.Object,
+    yaw: bpy.types.Object,
+    recoil: bpy.types.Object,
+    nebula_midnight: bpy.types.Material,
+    stellar_chrome: bpy.types.Material,
+    solar_ceramic: bpy.types.Material,
+) -> None:
+    orbit_specs = (
+        ((0.0, 0.0, 0.62), (0.12, 0.18, 0.0)),
+        ((0.0, 0.0, 0.66), (-0.16, 0.12, 0.52)),
+    )
+    for index, (location, rotation) in enumerate(orbit_specs):
+        add_torus(
+            f"{STELLAR_PREFIX}BaseOrbit_{index}",
+            root,
+            stellar_chrome,
+            location,
+            major_radius=0.91 + index * 0.045,
+            minor_radius=0.021,
+            rotation=rotation,
+            major_segments=24,
+            minor_segments=4,
+        )
+    for index, angle in enumerate((0.0, math.pi / 2.0, math.pi, math.pi * 1.5)):
+        add_cube(
+            f"{STELLAR_PREFIX}BaseStarPylon_{index}",
+            root,
+            solar_ceramic,
+            (math.cos(angle) * 0.83, math.sin(angle) * 0.83, 0.57),
+            (0.12, 0.035, 0.055),
+            (0.0, math.pi / 4.0, angle),
+            bevel=0.012,
+        )
+
+    for side in (-1.0, 1.0):
+        label = "L" if side > 0 else "R"
+        add_cylinder(
+            f"{STELLAR_PREFIX}ThrusterBody_{label}",
+            yaw,
+            nebula_midnight,
+            (-0.5, side * 0.7, 0.78),
+            radius=0.13,
+            depth=0.4,
+            rotation=(0.0, math.pi / 2.0, 0.0),
+            vertices=12,
+            bevel=0.012,
+        )
+        add_cone(
+            f"{STELLAR_PREFIX}ThrusterBell_{label}",
+            yaw,
+            stellar_chrome,
+            (-0.72, side * 0.7, 0.78),
+            radius1=0.17,
+            radius2=0.11,
+            depth=0.15,
+            rotation=(0.0, math.pi / 2.0, 0.0),
+            vertices=12,
+            capped=False,
+        )
+        add_cylinder(
+            f"{STELLAR_PREFIX}ThrusterBand_{label}",
+            yaw,
+            solar_ceramic,
+            (-0.43, side * 0.7, 0.78),
+            radius=0.145,
+            depth=0.045,
+            rotation=(0.0, math.pi / 2.0, 0.0),
+            vertices=12,
+        )
+
+        add_cube(
+            f"{STELLAR_PREFIX}SolarPanel_{label}",
+            recoil,
+            solar_ceramic,
+            (1.72, side * 0.41, 0.12),
+            (0.42, 0.035, 0.17),
+            (0.0, side * 0.12, 0.0),
+            bevel=0.012,
+        )
+        for rail_index, x in enumerate((1.42, 1.72, 2.02)):
+            add_cube(
+                f"{STELLAR_PREFIX}SolarRail_{label}_{rail_index}",
+                recoil,
+                stellar_chrome,
+                (x, side * 0.448, 0.12),
+                (0.018, 0.012, 0.17),
+                bevel=0.004,
+            )
+        add_cube(
+            f"{STELLAR_PREFIX}SolarSpine_{label}",
+            recoil,
+            stellar_chrome,
+            (1.72, side * 0.448, 0.12),
+            (0.42, 0.012, 0.018),
+            bevel=0.004,
+        )
+
+    for index, x in enumerate((1.28, 2.35)):
+        add_torus(
+            f"{STELLAR_PREFIX}BarrelOrbit_{index}",
+            recoil,
+            stellar_chrome,
+            (x, 0.0, 0.19),
+            major_radius=0.325,
+            minor_radius=0.021,
+            rotation=(0.0, math.pi / 2.0, index * 0.52),
+            major_segments=20,
+            minor_segments=4,
+        )
+    add_cone(
+        f"{STELLAR_PREFIX}Dish",
+        recoil,
+        stellar_chrome,
+        (-0.58, -0.48, 0.64),
+        radius1=0.2,
+        radius2=0.035,
+        depth=0.11,
+        rotation=(math.pi / 2.0, 0.0, 0.0),
+        vertices=16,
+        capped=False,
+    )
+    add_cylinder_between(
+        f"{STELLAR_PREFIX}DishMast",
+        recoil,
+        stellar_chrome,
+        (-0.58, -0.43, 0.64),
+        (-0.58, -0.34, 0.64),
+        radius=0.018,
+        vertices=8,
+    )
+    add_ico_sphere(
+        f"{STELLAR_PREFIX}DishReceiver",
+        recoil,
+        solar_ceramic,
+        (-0.58, -0.3, 0.64),
+        (0.055, 0.055, 0.055),
+        subdivisions=1,
+    )
+    for index, (y, z, angle) in enumerate(
+        ((0.0, 0.68, 0.0), (0.39, 0.29, math.pi / 2.0), (-0.39, 0.29, math.pi / 2.0), (0.0, -0.1, 0.0))
+    ):
+        add_cube(
+            f"{STELLAR_PREFIX}MuzzleStar_{index}",
+            recoil,
+            solar_ceramic,
+            (3.31, y, z),
+            (0.13, 0.035, 0.055),
+            (0.0, math.pi / 4.0, angle),
+            bevel=0.012,
+        )
+
+
 def build_ammo_system(
     recoil: bpy.types.Object,
     gunmetal: bpy.types.Material,
@@ -869,7 +1821,11 @@ def build_ammo_system(
     join_objects(glow_parts, f"{GENERATED_PREFIX}AmmoGlowMesh")
 
 
-def build_charge_fx(recoil: bpy.types.Object, slime: bpy.types.Material) -> None:
+def build_charge_fx(
+    recoil: bpy.types.Object,
+    slime: bpy.types.Material,
+    skin: str,
+) -> None:
     charge_group = new_group("CannonChargeGlow", recoil, "charge_glow")
     charge_parts = [
         add_torus(
@@ -885,22 +1841,181 @@ def build_charge_fx(recoil: bpy.types.Object, slime: bpy.types.Material) -> None
         )
         for index, x in enumerate((1.3, 1.75, 2.2, 2.65))
     ]
+    if skin == SKIN_DRAGON_NEW_YEAR:
+        for side in (-1.0, 1.0):
+            label = "L" if side > 0 else "R"
+            charge_parts.append(
+                add_uv_sphere(
+                    f"{DRAGON_PREFIX}EyeGlow_{label}",
+                    charge_group,
+                    slime,
+                    (3.055, side * 0.308, 0.49),
+                    (0.064, 0.035, 0.052),
+                    segments=8,
+                    rings=4,
+                )
+            )
+        charge_parts.append(
+            add_uv_sphere(
+                f"{DRAGON_PREFIX}PearlGlow",
+                charge_group,
+                slime,
+                (2.84, 0.0, 0.75),
+                (0.1, 0.075, 0.1),
+                segments=12,
+                rings=6,
+            )
+        )
+    elif skin == SKIN_BAMBOO_GUARDIAN:
+        for side in (-1.0, 1.0):
+            label = "L" if side > 0 else "R"
+            charge_parts.append(
+                add_uv_sphere(
+                    f"{BAMBOO_PREFIX}PandaEyeGlow_{label}",
+                    charge_group,
+                    slime,
+                    (3.075, side * 0.347, 0.46),
+                    (0.045, 0.014, 0.035),
+                    segments=8,
+                    rings=4,
+                )
+            )
+        charge_parts.append(
+            add_ico_sphere(
+                f"{BAMBOO_PREFIX}ForeheadGlow",
+                charge_group,
+                slime,
+                (3.18, 0.0, 0.55),
+                (0.055, 0.04, 0.05),
+                subdivisions=1,
+            )
+        )
+    elif skin == SKIN_ABYSSAL_WHALE:
+        for side in (-1.0, 1.0):
+            label = "L" if side > 0 else "R"
+            charge_parts.append(
+                add_uv_sphere(
+                    f"{ABYSSAL_PREFIX}WhaleEyeGlow_{label}",
+                    charge_group,
+                    slime,
+                    (3.02, side * 0.305, 0.48),
+                    (0.054, 0.016, 0.043),
+                    segments=8,
+                    rings=4,
+                )
+            )
+        for index, (x, y, z, radius) in enumerate(
+            ((2.72, 0.0, 0.58, 0.055), (2.6, 0.045, 0.73, 0.043), (2.47, -0.04, 0.86, 0.032))
+        ):
+            charge_parts.append(
+                add_ico_sphere(
+                    f"{ABYSSAL_PREFIX}BlowholeBubble_{index}",
+                    charge_group,
+                    slime,
+                    (x, y, z),
+                    (radius, radius, radius),
+                    subdivisions=1,
+                )
+            )
+    elif skin == SKIN_STELLAR_VOYAGER:
+        charge_parts.append(
+            add_ico_sphere(
+                f"{STELLAR_PREFIX}DishGlow",
+                charge_group,
+                slime,
+                (-0.58, -0.275, 0.64),
+                (0.05, 0.05, 0.05),
+                subdivisions=1,
+            )
+        )
+        for index, (x, y, z) in enumerate(
+            ((0.92, -0.31, 0.48), (1.42, 0.31, 0.5), (2.0, -0.31, 0.46), (2.58, 0.31, 0.5))
+        ):
+            charge_parts.append(
+                add_ico_sphere(
+                    f"{STELLAR_PREFIX}ConstellationGlow_{index}",
+                    charge_group,
+                    slime,
+                    (x, y, z),
+                    (0.045, 0.025, 0.045),
+                    subdivisions=1,
+                )
+            )
     join_objects(charge_parts, f"{GENERATED_PREFIX}ChargeGlowMesh")
 
 
-def build_muzzle_fx(recoil: bpy.types.Object, slime: bpy.types.Material) -> None:
+def build_muzzle_fx(
+    recoil: bpy.types.Object,
+    slime: bpy.types.Material,
+    skin: str,
+) -> None:
     muzzle_group = new_group("CannonMuzzleGlow", recoil, "muzzle_glow")
-    add_torus(
-        f"{GENERATED_PREFIX}MuzzleGlowMesh",
-        muzzle_group,
-        slime,
-        (3.405, 0.0, 0.29),
-        major_radius=0.245,
-        minor_radius=0.03,
-        rotation=(0.0, math.pi / 2, 0.0),
-        major_segments=24,
-        minor_segments=6,
-    )
+    muzzle_parts = [
+        add_torus(
+            f"{GENERATED_PREFIX}MuzzleGlowMesh",
+            muzzle_group,
+            slime,
+            (3.405, 0.0, 0.29),
+            major_radius=0.245,
+            minor_radius=0.03,
+            rotation=(0.0, math.pi / 2, 0.0),
+            major_segments=24,
+            minor_segments=6,
+        )
+    ]
+    if skin == SKIN_DRAGON_NEW_YEAR:
+        for side in (-1.0, 1.0):
+            label = "L" if side > 0 else "R"
+            muzzle_parts.append(
+                add_uv_sphere(
+                    f"{DRAGON_PREFIX}NostrilGlow_{label}",
+                    muzzle_group,
+                    slime,
+                    (3.385, side * 0.135, 0.385),
+                    (0.04, 0.025, 0.032),
+                    segments=8,
+                    rings=4,
+                )
+            )
+    elif skin == SKIN_BAMBOO_GUARDIAN:
+        for side in (-1.0, 1.0):
+            muzzle_parts.append(
+                add_ico_sphere(
+                    f"{BAMBOO_PREFIX}MuzzleLeafGlow_{'L' if side > 0 else 'R'}",
+                    muzzle_group,
+                    slime,
+                    (3.39, side * 0.13, 0.4),
+                    (0.04, 0.02, 0.032),
+                    subdivisions=1,
+                )
+            )
+    elif skin == SKIN_ABYSSAL_WHALE:
+        for side in (-1.0, 1.0):
+            muzzle_parts.append(
+                add_ico_sphere(
+                    f"{ABYSSAL_PREFIX}MuzzleBubbleGlow_{'L' if side > 0 else 'R'}",
+                    muzzle_group,
+                    slime,
+                    (3.385, side * 0.145, 0.38),
+                    (0.045, 0.025, 0.04),
+                    subdivisions=1,
+                )
+            )
+    elif skin == SKIN_STELLAR_VOYAGER:
+        muzzle_parts.append(
+            add_torus(
+                f"{STELLAR_PREFIX}MuzzleOrbitGlow",
+                muzzle_group,
+                slime,
+                (3.41, 0.0, 0.29),
+                major_radius=0.285,
+                minor_radius=0.014,
+                rotation=(0.0, math.pi / 2.0, 0.0),
+                major_segments=20,
+                minor_segments=4,
+            )
+        )
+    join_objects(muzzle_parts, f"{GENERATED_PREFIX}MuzzleGlowMesh")
 
 
 def build_gauge(
@@ -1044,26 +2159,48 @@ def scene_stats() -> tuple[int, int]:
     return mesh_count, triangle_count
 
 
-def build_asset() -> None:
+def remove_unused_materials() -> None:
+    for material in list(bpy.data.materials):
+        if material.users == 0:
+            bpy.data.materials.remove(material)
+
+
+def build_asset(skin: str) -> None:
     root = bpy.data.objects["CannonAssetRoot"]
     yaw = bpy.data.objects["CannonYaw"]
     recoil = bpy.data.objects["CannonRecoil"]
-    gunmetal, brass, safety, slime = tune_materials()
+    gunmetal, brass, safety, slime = tune_materials(skin)
 
     build_base(root, gunmetal, safety)
     build_yaw_mount(yaw, gunmetal, brass)
     build_recoil_body(recoil, gunmetal, brass, safety)
+    if skin == SKIN_DRAGON_NEW_YEAR:
+        build_dragon_base_decor(root, brass, safety)
+        build_dragon_lanterns(yaw, gunmetal, brass)
+        build_dragon_recoil_decor(recoil, brass, safety)
+    elif skin == SKIN_BAMBOO_GUARDIAN:
+        build_bamboo_guardian_decor(root, yaw, recoil, gunmetal, brass, safety)
+    elif skin == SKIN_ABYSSAL_WHALE:
+        build_abyssal_whale_decor(root, yaw, recoil, gunmetal, brass, safety)
+    elif skin == SKIN_STELLAR_VOYAGER:
+        build_stellar_voyager_decor(root, yaw, recoil, gunmetal, brass, safety)
     build_ammo_system(recoil, gunmetal, brass, slime)
-    build_charge_fx(recoil, slime)
-    build_muzzle_fx(recoil, slime)
+    build_charge_fx(recoil, slime, skin)
+    build_muzzle_fx(recoil, slime, skin)
     build_gauge(recoil, gunmetal, brass, safety, slime)
     build_status_light(recoil, gunmetal, brass, slime)
 
     root["asset_role"] = "game_cannon"
-    root["asset_id"] = "slop-zoo-cannon"
+    root["asset_id"] = "slop-zoo-cannon" if skin == SKIN_CLASSIC else f"slop-zoo-cannon-{skin}"
+    if skin != SKIN_CLASSIC:
+        root["skin_id"] = skin
+    elif "skin_id" in root:
+        del root["skin_id"]
     root["asset_version"] = UPGRADE_VERSION
     root["license"] = "MIT"
     bpy.context.scene["asset_upgrade_version"] = UPGRADE_VERSION
+    bpy.context.scene["asset_skin"] = skin
+    remove_unused_materials()
 
 
 def main() -> None:
@@ -1072,7 +2209,7 @@ def main() -> None:
     output_blend.parent.mkdir(parents=True, exist_ok=True)
     validate_control_contract()
     delete_render_meshes()
-    build_asset()
+    build_asset(args.skin)
     mesh_count, triangle_count = scene_stats()
     if triangle_count > MAX_SOURCE_TRIANGLES:
         raise RuntimeError(
@@ -1081,7 +2218,7 @@ def main() -> None:
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=str(output_blend), compress=True)
     print(
-        f"UPGRADE_OK blend={output_blend} version={UPGRADE_VERSION} "
+        f"UPGRADE_OK blend={output_blend} version={UPGRADE_VERSION} skin={args.skin} "
         f"objects={len(bpy.context.scene.objects)} meshes={mesh_count} "
         f"materials={len(bpy.data.materials)} triangles={triangle_count}"
     )

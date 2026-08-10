@@ -15,6 +15,7 @@
 - **三阶段 Boss 战**：不同阶段分别检验投食窗口、黏附引爆、反弹与横风中的移动核心命中。
 - **任务评价与成长**：C–S 评级、每关 3 枚照护徽章、积分/准确率/连击统计、顺序解锁、弹药与炮台模块奖励。
 - **本地存档**：任务进度、最佳成绩、奖励、配装和统计保存在本机，带版本迁移、备份与损坏恢复逻辑。
+- **5 套炮台外观配装**：配装页可在经典补给型、“龙腾新春”、“翠竹守护”、“深海鲸歌”与“星河巡游”之间切换，运行时加载对应 GLB 并继续驱动瞄准、后坐和反馈节点。五款当前均为默认永久解锁；“龙腾新春”保留免费春节限定标识，所有权与当前装备会写入版本化档案。
 - **画质与辅助设置**：低/中/高画质预设、手动与动态渲染比例、阴影和粒子分级，以及 UI 缩放、弹道线、瞄准辅助、镜头震动、音量、高对比、减少动态效果与手柄参数。
 - **键鼠、触摸与手柄**：包含设备自动切换、手柄菜单导航、死区/灵敏度/反转 Y 轴、支持设备的震动反馈，以及失去焦点自动暂停。
 - **物理与表现**：实时弹道预测、重力、连续线段碰撞、反弹、范围补给、落地黏液、粒子、后坐、屏幕震动和合成音效。
@@ -105,21 +106,63 @@ Windows 与 Linux 发行包配置使用占位应用身份，不包含代码签�
 
 ## Blender 素材管线
 
-仓库已经包含可编辑源文件 `blender/slop_zoo_game_assets.blend`。安装 Blender 后可重新导出 GLB：
+仓库包含 5 份独立、可编辑的 Blender 5.2 炮台源文件。所有外观共用同一机械骨架与运行时节点契约，装饰、材质和发布产物则彼此隔离：
+
+| 外观 | 设计语言 |
+|---|---|
+| 经典补给型 | 枪灰硬表面、老化黄铜、黏液弹药罐、输送管、充能线圈、压力表与检修面板组成的园区工业原型。 |
+| 龙腾新春 `dragon-new-year` | 朱漆、帝王金、翠玉瓷与翠玉能量，配合龙角、龙须、金鳞、龙脊、獠牙、明珠、灯笼与祥云构成春节限定轮廓。 |
+| 翠竹守护 `bamboo-guardian` | 墨绿竹漆、竹节金、熊猫瓷与竹叶能量，用环形竹丛、竹结挂饰、熊猫耳、眼斑、足印和炮管竹叶表现温和守护者形象。 |
+| 深海鲸歌 `abyssal-whale` | 深渊海军蓝、海洋铜、珊瑚珍珠与生物荧光，通过珊瑚簇、舷窗、浮标、鲸鳍、背鳍、尾鳍、鳃裂与呼吸孔形成深海蓝鲸轮廓。 |
+| 星河巡游 `stellar-voyager` | 星云紫甲、星际银铬、太阳陶瓷与跃迁能量，配置双轨道环、星芒基座、推进器、太阳能翼板、天线锅与炮口星标。 |
+
+安装 Blender 后可复现经典炮台的升级、导出与校验：
 
 ```bash
+npm run upgrade:assets
 npm run export:assets
+npm run check:assets:classic
 ```
+
+其他四款外观使用独立命令，不会覆盖经典源文件或彼此的发布资产：
+
+```bash
+npm run upgrade:assets:dragon
+npm run export:assets:dragon
+npm run check:assets:dragon
+
+npm run upgrade:assets:bamboo
+npm run export:assets:bamboo
+npm run check:assets:bamboo
+
+npm run upgrade:assets:abyssal
+npm run export:assets:abyssal
+npm run check:assets:abyssal
+
+npm run upgrade:assets:stellar
+npm run export:assets:stellar
+npm run check:assets:stellar
+```
+
+`npm run check:assets` 会一次校验全部 5 套发布资产及已提交 manifest 的路径、皮肤 ID、预算和 SHA-256。
 
 脚本会自动查找 `PATH` 中的 Blender，以及 macOS 和常见 Windows 安装位置。也可以显式指定：
 
 ```bash
-BLENDER_BIN=/path/to/blender npm run export:assets
+BLENDER_BIN=/path/to/blender npm run export:assets:dragon
 ```
 
-导出会更新 `public/assets/slop-cannon.glb`，即 Three.js 加载的发布资产。
+每款皮肤都由独立的 Blender 源文件、运行时 GLB、许可/校验 manifest 和配装目录预览图组成：
 
-Blender 源文件包含可复现生成的 V3 炮台：游戏级低面拓扑、黏液弹药罐保护框、输送管、充能线圈、顶部瞄准导轨、四向炮口护片、压力表刻度与指针、状态灯、检修面板和基座固定夹。发布导出保留以下运行时控制节点：
+| 外观 | Blender 源文件 | GLB / manifest | 配装预览 |
+|---|---|---|---|
+| 经典补给型 | `blender/slop_zoo_game_assets.blend` | `public/assets/slop-cannon.glb`<br>`public/assets/slop-cannon.asset.json` | `public/assets/previews/slop-cannon-classic.jpg` |
+| 龙腾新春 | `blender/slop_zoo_game_assets_dragon_new_year.blend` | `public/assets/slop-cannon-dragon-new-year.glb`<br>`public/assets/slop-cannon-dragon-new-year.asset.json` | `public/assets/previews/slop-cannon-dragon-new-year.jpg` |
+| 翠竹守护 | `blender/slop_zoo_game_assets_bamboo_guardian.blend` | `public/assets/slop-cannon-bamboo-guardian.glb`<br>`public/assets/slop-cannon-bamboo-guardian.asset.json` | `public/assets/previews/slop-cannon-bamboo-guardian.jpg` |
+| 深海鲸歌 | `blender/slop_zoo_game_assets_abyssal_whale.blend` | `public/assets/slop-cannon-abyssal-whale.glb`<br>`public/assets/slop-cannon-abyssal-whale.asset.json` | `public/assets/previews/slop-cannon-abyssal-whale.jpg` |
+| 星河巡游 | `blender/slop_zoo_game_assets_stellar_voyager.blend` | `public/assets/slop-cannon-stellar-voyager.glb`<br>`public/assets/slop-cannon-stellar-voyager.asset.json` | `public/assets/previews/slop-cannon-stellar-voyager.jpg` |
+
+发布导出保留以下运行时控制节点：
 
 - `CannonAssetRoot`：炮台资产根节点。
 - `CannonYaw`：水平瞄准。
@@ -132,7 +175,27 @@ Blender 源文件包含可复现生成的 V3 炮台：游戏级低面拓扑、�
 - `CannonStatusLight`：指示任务稳定度的状态灯。
 - `CannonMuzzleGlow`：响应蓄力、开火与后坐的炮口光效。
 
-当前 GLB 经合批、去重与 Meshopt 压缩后为 18 个节点、8 个网格、12 个图元、13,096 个三角面、4 个 PBR 材质和 94,560 字节。相较 V2，三角面减少约 52%，文件减少约 32%，同时保持无纹理、无动画、无相机和无灯光。导出阶段会拒绝退化面，并验证炮口/俯仰枢轴、五类反馈节点及压力表旋转轴；`public/assets/slop-cannon.asset.json` 记录许可证、工具链、SHA-256 与预算统计。实时黏液弹与飞溅由 Three.js 生成。
+五套炮台都保留上述 runtime 节点名称、层级、枢轴和反馈契约，因此切换皮肤不会改变炮弹出生点、瞄准、后坐或 HUD 反馈逻辑。全部 GLB 均为 18 个节点、8 个网格和 4 个 PBR 材质，经合批、去重与 Meshopt 压缩后的发布统计为：
+
+| 外观 | 图元 | 三角面 | GLB 大小 |
+|---|---:|---:|---:|
+| 经典补给型 | 12 | 13,096 | 94,544 字节 |
+| 龙腾新春 | 13 | 16,324 | 115,556 字节 |
+| 翠竹守护 | 14 | 16,064 | 115,336 字节 |
+| 深海鲸歌 | 14 | 15,732 | 113,600 字节 |
+| 星河巡游 | 14 | 15,284 | 109,188 字节 |
+
+经典款相较 V2 三角面减少约 52%、文件减少约 32%。五款都保持无纹理、无动画、无相机和无灯光；色漆、金属、陶瓷与发光效果全部由材质参数表现。每份独立 manifest 记录资产 ID、MIT 许可、Blender 5.2/glTF-Transform 工具链、SHA-256 与预算统计，四款非经典外观还会记录稳定皮肤 ID。导出阶段会拒绝退化面，并验证炮口/俯仰枢轴、五类反馈节点及压力表旋转轴；实时黏液弹与飞溅仍由 Three.js 生成。
+
+配装目录使用 5 张 960×540 JPG。它们不是 GLB 纹理，而是由 `tools/render_cannon_preview.py` 直接从各自 `.blend` 文件以相同相机、灯光和背景渲染的模型展示图。模型或材质更新后可用以下命令同步重建：
+
+```bash
+/path/to/blender --background blender/slop_zoo_game_assets.blend --python tools/render_cannon_preview.py -- --output public/assets/previews/slop-cannon-classic.jpg
+/path/to/blender --background blender/slop_zoo_game_assets_dragon_new_year.blend --python tools/render_cannon_preview.py -- --output public/assets/previews/slop-cannon-dragon-new-year.jpg
+/path/to/blender --background blender/slop_zoo_game_assets_bamboo_guardian.blend --python tools/render_cannon_preview.py -- --output public/assets/previews/slop-cannon-bamboo-guardian.jpg
+/path/to/blender --background blender/slop_zoo_game_assets_abyssal_whale.blend --python tools/render_cannon_preview.py -- --output public/assets/previews/slop-cannon-abyssal-whale.jpg
+/path/to/blender --background blender/slop_zoo_game_assets_stellar_voyager.blend --python tools/render_cannon_preview.py -- --output public/assets/previews/slop-cannon-stellar-voyager.jpg
+```
 
 ## 目录
 
@@ -141,6 +204,7 @@ index.html                           主菜单、任务/配装/设置界面与 H
 src/main.js                          Three.js 场景、任务运行时、物理、Boss 与音效
 src/style.css                        界面、HUD 与响应式布局
 src/content/gameContent.js           5 关、弹药、威胁、模块、奖励的数据定义
+src/content/cannonSkins.js           炮台外观目录、默认解锁与安全回退规则
 src/systems/inputSystem.js           键鼠/手柄输入、设备切换与震动
 src/systems/saveSystem.js            版本化本地存档、备份、迁移与任务奖励
 src/systems/settingsSystem.js        设置验证、持久化与运行时应用
@@ -157,6 +221,24 @@ test/platform-desktop.test.js        桌面安全、1000 次写入与损坏恢�
 public/assets/slop-cannon.glb         发布用 Blender 炮台模型
 public/assets/slop-cannon.asset.json  炮台许可、校验值与性能预算清单
 blender/slop_zoo_game_assets.blend   可编辑 Blender 源文件
+public/assets/slop-cannon-dragon-new-year.glb         龙腾新春发布模型
+public/assets/slop-cannon-dragon-new-year.asset.json  龙腾新春许可、校验值与预算清单
+blender/slop_zoo_game_assets_dragon_new_year.blend   龙腾新春独立 Blender 5.2 源文件
+public/assets/slop-cannon-bamboo-guardian.glb        翠竹守护发布模型
+public/assets/slop-cannon-bamboo-guardian.asset.json 翠竹守护许可、校验值与预算清单
+blender/slop_zoo_game_assets_bamboo_guardian.blend  翠竹守护独立 Blender 5.2 源文件
+public/assets/slop-cannon-abyssal-whale.glb          深海鲸歌发布模型
+public/assets/slop-cannon-abyssal-whale.asset.json   深海鲸歌许可、校验值与预算清单
+blender/slop_zoo_game_assets_abyssal_whale.blend    深海鲸歌独立 Blender 5.2 源文件
+public/assets/slop-cannon-stellar-voyager.glb        星河巡游发布模型
+public/assets/slop-cannon-stellar-voyager.asset.json 星河巡游许可、校验值与预算清单
+blender/slop_zoo_game_assets_stellar_voyager.blend  星河巡游独立 Blender 5.2 源文件
+public/assets/previews/slop-cannon-classic.jpg        经典炮台配装目录预览
+public/assets/previews/slop-cannon-dragon-new-year.jpg 龙腾新春配装目录预览
+public/assets/previews/slop-cannon-bamboo-guardian.jpg 翠竹守护配装目录预览
+public/assets/previews/slop-cannon-abyssal-whale.jpg   深海鲸歌配装目录预览
+public/assets/previews/slop-cannon-stellar-voyager.jpg 星河巡游配装目录预览
+tools/render_cannon_preview.py                        五款炮台共用的 Blender 预览渲染脚本
 tools/                               Blender 导出与资产净化工具
 GAME_DESIGN.md                       Steam 1.0 内容设计
 STEAM_RELEASE_PLAN.md                Steam 发行路线与验收门槛
@@ -193,4 +275,4 @@ Blender 5.2 LTS 后台导出已验证通过。网页切片已覆盖主菜单、�
 
 ## 开源许可证
 
-代码、Blender 源文件与 GLB 资产均按 [MIT License](LICENSE) 开源。素材范围说明见 [ASSET_LICENSE.md](ASSET_LICENSE.md)。
+代码、Blender 源文件、GLB 资产与由其生成的配装预览图均按 [MIT License](LICENSE) 开源。素材范围说明见 [ASSET_LICENSE.md](ASSET_LICENSE.md)。

@@ -4,16 +4,57 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const sourceBlend = join(projectRoot, 'blender', 'slop_zoo_game_assets.blend');
 const exporter = join(projectRoot, 'tools', 'export_game_glb.py');
 const validator = join(projectRoot, 'tools', 'validate_game_glb.mjs');
-const outputGlb = join(projectRoot, 'public', 'assets', 'slop-cannon.glb');
-const outputManifest = join(projectRoot, 'public', 'assets', 'slop-cannon.asset.json');
-const buildDir = join(projectRoot, 'public', 'assets', '.asset-build');
-const rawGlb = join(buildDir, 'slop-cannon.raw.glb');
-const dedupGlb = join(buildDir, 'slop-cannon.dedup.glb');
-const finalGlb = join(buildDir, 'slop-cannon.final.glb');
-const finalManifest = join(buildDir, 'slop-cannon.asset.json');
+const buildRoot = join(projectRoot, 'public', 'assets', '.asset-build');
+const variants = Object.freeze({
+  classic: {
+    sourceBlend: join(projectRoot, 'blender', 'slop_zoo_game_assets.blend'),
+    source: 'blender/slop_zoo_game_assets.blend',
+    output: 'public/assets/slop-cannon.glb',
+    manifest: 'public/assets/slop-cannon.asset.json',
+    buildStem: 'slop-cannon',
+    assetId: 'slop-zoo-cannon',
+    skinId: null,
+  },
+  'dragon-new-year': {
+    sourceBlend: join(projectRoot, 'blender', 'slop_zoo_game_assets_dragon_new_year.blend'),
+    source: 'blender/slop_zoo_game_assets_dragon_new_year.blend',
+    output: 'public/assets/slop-cannon-dragon-new-year.glb',
+    manifest: 'public/assets/slop-cannon-dragon-new-year.asset.json',
+    buildStem: 'slop-cannon-dragon-new-year',
+    assetId: 'slop-zoo-cannon-dragon-new-year',
+    skinId: 'dragon-new-year',
+  },
+  'bamboo-guardian': {
+    sourceBlend: join(projectRoot, 'blender', 'slop_zoo_game_assets_bamboo_guardian.blend'),
+    source: 'blender/slop_zoo_game_assets_bamboo_guardian.blend',
+    output: 'public/assets/slop-cannon-bamboo-guardian.glb',
+    manifest: 'public/assets/slop-cannon-bamboo-guardian.asset.json',
+    buildStem: 'slop-cannon-bamboo-guardian',
+    assetId: 'slop-zoo-cannon-bamboo-guardian',
+    skinId: 'bamboo-guardian',
+  },
+  'abyssal-whale': {
+    sourceBlend: join(projectRoot, 'blender', 'slop_zoo_game_assets_abyssal_whale.blend'),
+    source: 'blender/slop_zoo_game_assets_abyssal_whale.blend',
+    output: 'public/assets/slop-cannon-abyssal-whale.glb',
+    manifest: 'public/assets/slop-cannon-abyssal-whale.asset.json',
+    buildStem: 'slop-cannon-abyssal-whale',
+    assetId: 'slop-zoo-cannon-abyssal-whale',
+    skinId: 'abyssal-whale',
+  },
+  'stellar-voyager': {
+    sourceBlend: join(projectRoot, 'blender', 'slop_zoo_game_assets_stellar_voyager.blend'),
+    source: 'blender/slop_zoo_game_assets_stellar_voyager.blend',
+    output: 'public/assets/slop-cannon-stellar-voyager.glb',
+    manifest: 'public/assets/slop-cannon-stellar-voyager.asset.json',
+    buildStem: 'slop-cannon-stellar-voyager',
+    assetId: 'slop-zoo-cannon-stellar-voyager',
+    skinId: 'stellar-voyager',
+  },
+});
+const variantNames = Object.keys(variants);
 const gltfTransform = join(
   projectRoot,
   'node_modules',
@@ -27,6 +68,44 @@ const candidates = [
   '/Applications/Blender.app/Contents/MacOS/Blender',
   'C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe',
 ].filter(Boolean);
+
+function parseVariant() {
+  const args = process.argv.slice(2);
+  let variant = 'classic';
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--variant') {
+      if (!args[index + 1]) {
+        console.error(`Missing value for --variant. Expected one of: ${variantNames.join(', ')}.`);
+        process.exit(1);
+      }
+      variant = args[index + 1];
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith('--variant=')) {
+      variant = argument.slice('--variant='.length);
+      continue;
+    }
+    console.error(`Unknown argument: ${argument}`);
+    process.exit(1);
+  }
+  if (!Object.hasOwn(variants, variant)) {
+    console.error(`Unknown asset variant: ${variant}. Expected one of: ${variantNames.join(', ')}.`);
+    process.exit(1);
+  }
+  return variant;
+}
+
+const variant = parseVariant();
+const asset = variants[variant];
+const buildDir = join(buildRoot, asset.buildStem);
+const outputGlb = join(projectRoot, asset.output);
+const outputManifest = join(projectRoot, asset.manifest);
+const rawGlb = join(buildDir, `${asset.buildStem}.raw.glb`);
+const dedupGlb = join(buildDir, `${asset.buildStem}.dedup.glb`);
+const finalGlb = join(buildDir, `${asset.buildStem}.final.glb`);
+const finalManifest = join(buildDir, `${asset.buildStem}.asset.json`);
 
 function works(candidate) {
   if (candidate.includes('/') || candidate.includes('\\')) {
@@ -63,7 +142,7 @@ try {
     '--disable-autoexec',
     '--python-exit-code',
     '1',
-    sourceBlend,
+    asset.sourceBlend,
     '--python',
     exporter,
     '--',
@@ -85,7 +164,20 @@ try {
     '10',
   ]);
   run(gltfTransform, ['validate', finalGlb]);
-  run(process.execPath, [validator, finalGlb, '--manifest', finalManifest]);
+  const validationArgs = [
+    validator,
+    finalGlb,
+    '--manifest',
+    finalManifest,
+    '--asset-id',
+    asset.assetId,
+    '--source',
+    asset.source,
+    '--output',
+    asset.output,
+  ];
+  if (asset.skinId) validationArgs.push('--skin-id', asset.skinId);
+  run(process.execPath, validationArgs);
   renameSync(finalGlb, outputGlb);
   renameSync(finalManifest, outputManifest);
 } finally {

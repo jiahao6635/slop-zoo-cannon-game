@@ -12,6 +12,13 @@ import {
   validateGameContent,
 } from './content/gameContent.js';
 import {
+  CANNON_SKINS,
+  DEFAULT_CANNON_SKIN_ID,
+  getCannonSkinById,
+  resolveCannonSkinId,
+  validateCannonSkins,
+} from './content/cannonSkins.js';
+import {
   getBestMissionResult,
   isMissionUnlocked,
   loadSave,
@@ -227,6 +234,7 @@ const game = {
   mission: null,
   equippedAmmo: ['nutrient-gel'],
   equippedModule: 'pressure-stabilizer',
+  equippedCannonSkin: DEFAULT_CANNON_SKIN_ID,
   activeAmmoIndex: 0,
   inventory: {},
   score: 0,
@@ -330,6 +338,12 @@ let modelChargeMeshes = [];
 let modelAmmoMeshes = [];
 let modelStatusMeshes = [];
 let modelMuzzleMeshes = [];
+const cannonAssetLoader = createCannonAssetLoader();
+const cannonSkinAssetCache = new Map();
+let activeCannonRoot = null;
+let activeCannonSkinId = null;
+let pendingCannonSkinId = null;
+let cannonSkinRequestId = 0;
 
 const trajectoryGeometry = new THREE.BufferGeometry();
 const trajectoryPoints = new Float32Array(42 * 3);
@@ -1108,6 +1122,10 @@ function buildEnvironment() {
 }
 
 function createFallbackCannon() {
+  if (activeCannonRoot) {
+    activeCannonRoot.visible = false;
+    cannonMount.remove(activeCannonRoot);
+  }
   const root = new THREE.Group();
   root.name = 'FallbackCannon';
   cannonMount.add(root);
@@ -1148,55 +1166,143 @@ function createFallbackCannon() {
   modelAmmoMeshes = [];
   modelStatusMeshes = [];
   modelMuzzleMeshes = [];
+  activeCannonRoot = root;
+  activeCannonSkinId = null;
   game.modelReady = true;
   return root;
 }
 
-function loadCannonAsset() {
-  return new Promise((resolve) => {
-    const loader = createCannonAssetLoader();
-    loader.load(
-      `${import.meta.env.BASE_URL}assets/slop-cannon.glb`,
+function disposeUnusableCannonAsset(root) {
+  const materials = new Set();
+  root?.traverse((node) => {
+    if (!node.isMesh) return;
+    node.geometry?.dispose?.();
+    const list = Array.isArray(node.material) ? node.material : [node.material];
+    list.forEach((material) => materials.add(material));
+  });
+  materials.forEach((material) => material?.dispose?.());
+}
+
+function loadCannonSkinAsset(skin, onProgress = null) {
+  const cached = cannonSkinAssetCache.get(skin.id);
+  if (cached) return cached;
+
+  const promise = new Promise((resolve, reject) => {
+    cannonAssetLoader.load(
+      `${import.meta.env.BASE_URL}${skin.assetPath}`,
       (gltf) => {
         const root = gltf.scene;
-        root.name = 'BlenderSlopCannon';
+        root.name = `BlenderSlopCannon_${skin.id}`;
         prepareCannonAsset(root);
-        cannonMount.add(root);
         const rig = resolveCannonRig(root);
         if (rig.missing.length > 0) {
-          cannonMount.remove(root);
-          createFallbackCannon();
-          toast(`Blender 素材层级缺失：${rig.missing.join('、')}，已启用备用炮台`, 'warning');
-        } else {
-          modelYaw = rig.yaw;
-          modelPitch = rig.pitch;
-          modelRecoil = rig.recoil;
-          modelMuzzle = rig.muzzle;
-          modelRecoilBase.copy(modelRecoil.position);
-          modelGaugeNeedle = rig.gaugeNeedle;
-          modelGaugeNeedleBase = modelGaugeNeedle?.rotation.z ?? 0;
-          modelChargeMeshes = collectNodeMeshes(rig.chargeGlow);
-          modelAmmoMeshes = collectNodeMeshes(rig.ammoGlow);
-          modelStatusMeshes = collectNodeMeshes(rig.statusLight);
-          modelMuzzleMeshes = collectNodeMeshes(rig.muzzleGlow);
-          game.modelReady = true;
+          disposeUnusableCannonAsset(root);
+          reject(new Error(`Blender 素材层级缺失：${rig.missing.join('、')}`));
+          return;
         }
-        dom.loadingProgress.style.width = '100%';
-        resolve();
+        root.visible = false;
+        resolve({
+          root,
+          rig,
+          recoilBase: rig.recoil.position.clone(),
+          gaugeNeedleBase: rig.gaugeNeedle?.rotation.z ?? 0,
+        });
       },
-      (event) => {
-        if (!event.total) return;
-        const percent = Math.min(96, Math.round((event.loaded / event.total) * 100));
-        dom.loadingProgress.style.width = `${percent}%`;
-      },
-      () => {
-        createFallbackCannon();
-        dom.loadingProgress.style.width = '100%';
-        toast('未找到 GLB，已启用程序化备用炮台', 'warning');
-        resolve();
-      },
+      onProgress ?? undefined,
+      (error) => reject(error instanceof Error ? error : new Error(`Unable to load ${skin.assetPath}`)),
     );
   });
+
+  cannonSkinAssetCache.set(skin.id, promise);
+  promise.catch(() => {
+    if (cannonSkinAssetCache.get(skin.id) === promise) cannonSkinAssetCache.delete(skin.id);
+  });
+  return promise;
+}
+
+function activateCannonSkinAsset(skinId, asset) {
+  if (activeCannonRoot && activeCannonRoot !== asset.root) {
+    activeCannonRoot.visible = false;
+    cannonMount.remove(activeCannonRoot);
+  }
+  if (asset.root.parent !== cannonMount) cannonMount.add(asset.root);
+  asset.root.visible = true;
+  activeCannonRoot = asset.root;
+  activeCannonSkinId = skinId;
+
+  modelYaw = asset.rig.yaw;
+  modelPitch = asset.rig.pitch;
+  modelRecoil = asset.rig.recoil;
+  modelMuzzle = asset.rig.muzzle;
+  modelRecoilBase.copy(asset.recoilBase);
+  modelRecoil.position.copy(asset.recoilBase);
+  modelGaugeNeedle = asset.rig.gaugeNeedle;
+  modelGaugeNeedleBase = asset.gaugeNeedleBase;
+  if (modelGaugeNeedle) modelGaugeNeedle.rotation.z = modelGaugeNeedleBase;
+  modelChargeMeshes = collectNodeMeshes(asset.rig.chargeGlow);
+  modelAmmoMeshes = collectNodeMeshes(asset.rig.ammoGlow);
+  modelStatusMeshes = collectNodeMeshes(asset.rig.statusLight);
+  modelMuzzleMeshes = collectNodeMeshes(asset.rig.muzzleGlow);
+  game.modelReady = true;
+  updateAimRigs();
+  updateCannonModelFeedback();
+}
+
+async function requestCannonSkin(skinId, options = {}) {
+  const resolvedId = resolveCannonSkinId(skinId, saveData?.unlocks?.cosmetics);
+  const skin = getCannonSkinById(resolvedId);
+  if (!skin) return false;
+  if (activeCannonSkinId === skin.id && activeCannonRoot) {
+    if (pendingCannonSkinId) cannonSkinRequestId += 1;
+    pendingCannonSkinId = null;
+    game.equippedCannonSkin = skin.id;
+    renderCannonSkinOptions();
+    return true;
+  }
+
+  const requestId = ++cannonSkinRequestId;
+  pendingCannonSkinId = skin.id;
+  renderCannonSkinOptions();
+  try {
+    const asset = await loadCannonSkinAsset(skin, options.onProgress);
+    if (requestId !== cannonSkinRequestId) return false;
+    activateCannonSkinAsset(skin.id, asset);
+    game.equippedCannonSkin = skin.id;
+    if (options.announceSuccess) toast(`炮台外观：${skin.name}`, 'success');
+    return true;
+  } catch (error) {
+    if (requestId !== cannonSkinRequestId) return false;
+    console.warn(`Unable to load cannon skin ${skin.id}.`, error);
+    if (options.announceFailure) {
+      const activeName = getCannonSkinById(activeCannonSkinId)?.name ?? '当前炮台';
+      toast(`${skin.name}加载失败，已保留${activeName}`, 'warning');
+    }
+    return false;
+  } finally {
+    if (requestId === cannonSkinRequestId) {
+      pendingCannonSkinId = null;
+      renderCannonSkinOptions();
+    }
+  }
+}
+
+async function loadCannonAsset() {
+  const preferredId = resolveCannonSkinId(saveData.loadout.cannonSkin, saveData.unlocks.cosmetics);
+  const onProgress = (event) => {
+    if (!event.total) return;
+    const percent = Math.min(96, Math.round((event.loaded / event.total) * 100));
+    dom.loadingProgress.style.width = `${percent}%`;
+  };
+  let loaded = await requestCannonSkin(preferredId, { onProgress });
+  if (!loaded && preferredId !== DEFAULT_CANNON_SKIN_ID) {
+    loaded = await requestCannonSkin(DEFAULT_CANNON_SKIN_ID, { onProgress });
+    if (loaded) toast('限定外观加载失败，已回退至经典炮台', 'warning');
+  }
+  if (!loaded) {
+    createFallbackCannon();
+    toast('未找到可用 GLB，已启用程序化备用炮台', 'warning');
+  }
+  dom.loadingProgress.style.width = '100%';
 }
 
 function createAnimalTarget(kind) {
@@ -3122,6 +3228,104 @@ function renderLoadout() {
     if (lockedName) lockedName.textContent = nextLockedModule?.name ?? '';
     if (lockedCopy) lockedCopy.textContent = nextLockedModule ? '继续完成任务以解锁' : '';
   }
+  renderCannonSkinOptions();
+}
+
+function createCannonSkinOption(skin) {
+  const option = document.createElement('button');
+  option.id = `cannon-skin-option-${skin.id}`;
+  option.className = 'cannon-skin-card';
+  option.type = 'button';
+  option.dataset.cannonSkin = skin.id;
+  option.setAttribute('aria-pressed', 'false');
+
+  const icon = document.createElement('span');
+  icon.className = 'cannon-skin-card__icon';
+  icon.setAttribute('aria-hidden', 'true');
+
+  const copy = document.createElement('span');
+  copy.append(document.createElement('small'), document.createElement('strong'), document.createElement('em'));
+
+  option.append(icon, copy, document.createElement('b'));
+  return option;
+}
+
+function syncCannonSkinOptionElements() {
+  const options = dom.loadout?.querySelector('.cannon-skin-options');
+  if (!options) return;
+  const catalogueIds = new Set(CANNON_SKINS.map((skin) => skin.id));
+  for (const option of options.querySelectorAll('[data-cannon-skin]')) {
+    if (!catalogueIds.has(option.dataset.cannonSkin)) option.remove();
+  }
+  CANNON_SKINS.forEach((skin, index) => {
+    const option = $(`cannon-skin-option-${skin.id}`) ?? createCannonSkinOption(skin);
+    if (options.children[index] !== option) options.insertBefore(option, options.children[index] ?? null);
+  });
+}
+
+function renderCannonSkinOptions() {
+  if (!dom.loadout || !saveData) return;
+  syncCannonSkinOptionElements();
+  const loadingSkin = Boolean(pendingCannonSkinId);
+  dom.loadout.setAttribute('aria-busy', String(loadingSkin));
+  dom.launchMissionButton.disabled = loadingSkin;
+  dom.launchMissionButton.setAttribute('aria-busy', String(loadingSkin));
+  const launchStatus = dom.launchMissionButton.querySelector('small');
+  if (launchStatus) launchStatus.textContent = loadingSkin ? 'LOADING SKIN' : 'DEPLOY';
+  const previewSkin = getCannonSkinById(pendingCannonSkinId ?? game.equippedCannonSkin)
+    ?? getCannonSkinById(DEFAULT_CANNON_SKIN_ID);
+  const previewImage = $('cannon-skin-preview-image');
+  const previewLabel = $('cannon-skin-preview-label');
+  const previewName = $('cannon-skin-preview-name');
+  if (previewImage && previewSkin) {
+    const previewUrl = `${import.meta.env.BASE_URL}${previewSkin.previewPath}`;
+    if (previewImage.getAttribute('src') !== previewUrl) previewImage.src = previewUrl;
+    previewImage.alt = `${previewSkin.name}炮台 Blender 模型预览`;
+  }
+  if (previewLabel) previewLabel.textContent = loadingSkin ? 'LOADING 3D ASSET' : previewSkin?.label ?? '';
+  if (previewName) previewName.textContent = previewSkin?.name ?? '';
+  for (const skin of CANNON_SKINS) {
+    const option = $(`cannon-skin-option-${skin.id}`);
+    if (!option) continue;
+    const unlocked = saveData.unlocks.cosmetics.includes(skin.id);
+    const equipped = game.equippedCannonSkin === skin.id;
+    const loading = pendingCannonSkinId === skin.id;
+    option.disabled = !unlocked;
+    option.dataset.cannonSkin = skin.id;
+    option.classList.toggle('is-equipped', equipped);
+    option.classList.toggle('is-locked', !unlocked);
+    option.classList.toggle('is-loading', loading);
+    option.setAttribute('aria-disabled', String(!unlocked));
+    option.setAttribute('aria-pressed', String(equipped));
+    const icon = option.querySelector('.cannon-skin-card__icon');
+    const label = option.querySelector('small');
+    const name = option.querySelector('strong');
+    const description = option.querySelector('em');
+    const status = option.querySelector('b');
+    const statusText = !unlocked ? '未解锁' : loading ? '载入中' : equipped ? '已装备' : '预览';
+    if (icon) icon.textContent = skin.icon;
+    if (label) label.textContent = skin.label;
+    if (name) name.textContent = skin.name;
+    if (description) description.textContent = skin.description;
+    if (status) status.textContent = statusText;
+    option.setAttribute('aria-label', `${skin.name}：${skin.description}。${statusText}`);
+  }
+}
+
+async function previewCannonSkin(skinId) {
+  const skin = getCannonSkinById(skinId);
+  if (!skin || !saveData.unlocks.cosmetics.includes(skin.id)) {
+    toast('该炮台外观尚未解锁', 'warning');
+    return;
+  }
+  const activated = await requestCannonSkin(skin.id, {
+    announceSuccess: true,
+    announceFailure: true,
+  });
+  if (activated && saveData.loadout.cannonSkin !== game.equippedCannonSkin) {
+    saveData.loadout.cannonSkin = game.equippedCannonSkin;
+    saveData = saveProgress(saveData);
+  }
 }
 
 function prioritizeLoadoutAmmo(ammoId) {
@@ -3144,8 +3348,13 @@ function cycleLoadoutModule() {
 }
 
 function launchSelectedMission() {
+  if (pendingCannonSkinId) {
+    toast('炮台外观仍在载入，请稍候', 'warning');
+    return;
+  }
   saveData.loadout.ammo = [...game.equippedAmmo];
   saveData.loadout.module = game.equippedModule;
+  saveData.loadout.cannonSkin = game.equippedCannonSkin;
   saveData.campaign.lastMissionId = game.selectedMissionId;
   saveData = saveProgress(saveData);
   startMission(game.selectedMissionId);
@@ -3336,6 +3545,10 @@ function startMission(missionId = game.selectedMissionId, options = {}) {
   if (!classic && !isMissionUnlocked(mission.id, saveData)) {
     toast('请先完成上一任务', 'warning');
     return;
+  }
+  if (saveData.loadout.cannonSkin !== game.equippedCannonSkin) {
+    saveData.loadout.cannonSkin = game.equippedCannonSkin;
+    saveData = saveProgress(saveData);
   }
 
   clearRoundObjects();
@@ -3801,11 +4014,13 @@ function bindEvents() {
   dom.loadoutBackButton.addEventListener('click', showMissionSelect);
   dom.launchMissionButton.addEventListener('click', launchSelectedMission);
   dom.loadout.addEventListener('click', (event) => {
+    const cannonSkinOption = event.target.closest('[data-cannon-skin]');
     const ammoOption = event.target.closest('[data-ammo]');
     const ammoSlot = event.target.closest('.ammo-slot[data-ammo]');
     const moduleOption = event.target.closest('#module-option-stabilizer');
     const ammoId = ammoOption?.dataset.ammo ?? ammoSlot?.dataset.ammo;
-    if (ammoId) prioritizeLoadoutAmmo(ammoId);
+    if (cannonSkinOption) void previewCannonSkin(cannonSkinOption.dataset.cannonSkin);
+    else if (ammoId) prioritizeLoadoutAmmo(ammoId);
     else if (moduleOption) cycleLoadoutModule();
   });
 
@@ -3991,7 +4206,7 @@ function renderLoop(now) {
 }
 
 async function init() {
-  const contentErrors = validateGameContent();
+  const contentErrors = [...validateGameContent(), ...validateCannonSkins()];
   if (contentErrors.length > 0) throw new Error(`Content validation failed:\n${contentErrors.join('\n')}`);
   settings = loadSettings();
   saveData = loadSave();
@@ -4044,6 +4259,7 @@ function installDebugApi() {
       feeds: game.feeds,
       threatProgress: game.threatProgress,
       bossPhase: game.bossPhase,
+      cannonSkin: game.equippedCannonSkin,
       entities: getRuntimeEntityCounts(),
       graphics: getRuntimeGraphicsReport(),
       unlocked: MISSIONS.filter((mission) => isMissionUnlocked(mission.id, saveData)).map((mission) => mission.id),
